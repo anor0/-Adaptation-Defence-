@@ -1,9 +1,10 @@
 #include <iostream>
 #include "raylib.h"
+#include <vector>
 
 const int rows = 13;
 const int cols = 13;
-const int cellSize = 40; 
+const int cellSize = 40;
 int i, j;
 
 const int matrix1[rows][cols] = {
@@ -53,26 +54,35 @@ const int matrix3[rows][cols] = {
 };
 
 void DrawMatrix(const int(&matrix)[rows][cols]) {
-    for ( i = 0; i < rows; i++) {
+    for (i = 0; i < rows; i++) {
         for (j = 0; j < cols; j++) {
             switch (matrix[i][j]) {
             case 1:
-                DrawRectangle(j * 20, i * 20, 20, 20, DARKGRAY);
+                DrawRectangle(j * cellSize, i * cellSize, cellSize, cellSize, DARKGRAY);
                 break;
             case 2:
-                DrawRectangle(j * 20, i * 20, 20, 20, RED);
+                DrawRectangle(j * cellSize, i * cellSize, cellSize, cellSize, RED);
                 break;
             case 3:
-                DrawRectangle(j * 20, i * 20, 20, 20, GREEN);
+                DrawRectangle(j * cellSize, i * cellSize, cellSize, cellSize, GREEN);
                 break;
             default:
-                DrawRectangle(j * 20, i * 20, 20, 20, WHITE);
+                DrawRectangle(j * cellSize, i * cellSize, cellSize, cellSize, WHITE);
                 break;
             }
         }
     }
 }
 
+void enemy1()
+{
+    Vector2 start = { 6,6 };
+    Vector2 end = { 6,12 };
+}
+void drawenemy1()
+{
+
+}
 int main() {
     InitWindow(800, 600, "Matrix Drawing Example");
     SetTargetFPS(60);
@@ -80,7 +90,7 @@ int main() {
     bool show2 = false;
     bool show3 = false;
     while (!WindowShouldClose()) {
-        
+
         if (IsKeyPressed(KEY_X)) {
             show1 = !show1;
         }
