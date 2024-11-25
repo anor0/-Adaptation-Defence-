@@ -1,18 +1,19 @@
 #include <iostream>
 #include "raylib.h"
 #include <vector>
-// 0 - пустая хорошенькая клетка
+// 0 - 99 ландшафт
 // 1 - невозможно пройти 
 // 2 - спавнер
 // 3 - база
-// 4 _ 7 - пулемётная башня
-// 8 _ 11 - ракетная башня
+// 100 - 199 - пулемётная башня
+// 200 - 299ракетная башня
 // 12 _ - клетки повышеной стоимости
 const int rows = 13;
 const int cols = 13;
 const int cellSize = 40;
-int i, j;
 
+int i, j;
+int cost = 0;
 const int matrix1[rows][cols] = {
     {1,1,1,1,1,1,2,1,1,1,1,1,1},
     {1,0,0,0,0,0,0,0,0,0,0,0,1},
@@ -58,39 +59,25 @@ const int matrix3[rows][cols] = {
         {1,0,0,0,0,0,1,1,0,0,0,0,0},
         {1,1,1,1,1,1,1,1,1,0,0,0,2}
 };
-void WalkCost(const int(&matrix)[rows][cols]) 
-{
-    int cost;
-    for (i = 0; i < rows; i++) {
-        for (j = 0; j < cols; j++) {
-            switch (matrix[i][j]) {
-            case 1:
-                cost = 1000000;
-                break;
-            case 0:
-                cost = 0;
-                break;
-            if case (4 or 8):
-            
-            }
-        }
-    }
-}
+
+
 void DrawMatrix(const int(&matrix)[rows][cols]) {
+    const int otstup = 5;
     for (i = 0; i < rows; i++) {
         for (j = 0; j < cols; j++) {
             switch (matrix[i][j]) {
             case 1:
-                DrawRectangle(j * cellSize, i * cellSize, cellSize, cellSize, DARKGRAY);
+                DrawRectangle(j * (cellSize+otstup), i * (cellSize + otstup), cellSize, cellSize, DARKBLUE);
+                
                 break;
             case 2:
-                DrawRectangle(j * cellSize, i * cellSize, cellSize, cellSize, RED);
+                DrawRectangle(j * (cellSize + otstup), i * (cellSize + otstup), cellSize, cellSize, RED);
                 break;
             case 3:
-                DrawRectangle(j * cellSize, i * cellSize, cellSize, cellSize, GREEN);
+                DrawRectangle(j * (cellSize + otstup), i * (cellSize + otstup), cellSize, cellSize, GREEN);
                 break;
             default:
-                DrawRectangle(j * cellSize, i * cellSize, cellSize, cellSize, WHITE);
+                DrawRectangle(j * (cellSize + otstup), i * (cellSize + otstup), cellSize, cellSize, WHITE);
                 break;
             }
         }
@@ -104,7 +91,7 @@ void drawenemy1()
 
 }
 int main() {
-    InitWindow(800, 600, "Matrix Drawing Example");
+    InitWindow(800, 600, "Game");
     SetTargetFPS(60);
     bool show1 = true;
     bool show2 = false;
@@ -122,7 +109,7 @@ int main() {
         }
 
         BeginDrawing();
-        ClearBackground(RAYWHITE);
+        ClearBackground(DARKGRAY);
 
         if (show1) {
             DrawMatrix(matrix1);
