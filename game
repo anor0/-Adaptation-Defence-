@@ -1,9 +1,16 @@
 #include <iostream>
-#include "raylib.h"
 #include <vector>
-#include <string>
-#include <queue> // Для работы с очередями
-#include <algorithm> // Для std::min
+#include <queue>
+#include <algorithm>
+#include <cmath>
+#include "raylib.h"
+
+// Определение констант
+
+const int rows = 13;
+const int cols = 13;
+const int cellSize = 40;
+const int otstup = 5;
 
 // 0 - 99 ландшафт
 // 1 - невозможно пройти 
@@ -12,13 +19,7 @@
 // 100 - 199 - пулемётная башня
 // 200 - 299 - ракетная башня
 // 12 _ - клетки повышеной стоимости
-const int rows = 13;
-const int cols = 13;
-const int cellSize = 40;
-const int otstup = 5;
-int i, j;
-int cost = 0;
-// уровни
+
 const int matrix1[rows][cols] = {
     {1,1,1,1,1,1,2,1,1,1,1,1,1},
     {1,0,0,0,0,0,0,0,0,0,0,0,1},
@@ -36,9 +37,76 @@ const int matrix1[rows][cols] = {
 };
 
 
+
+
+
+// поиск пути A*
+struct Node {
+    int x, y;
+    int g, h; // g - cost от старта, h - heuristic до цели
+    Node* parent;
+
+    int f() const { return g + h; } // общая стоимость
+    bool operator>(const Node& other) const { return f() > other.f(); }
+};
+
+// если клетка в деапозоне масива
+bool isValid(int x, int y) {
+    return x >= 0 && x < cols && y >= 0 && y < rows;
+}
+
+// Эвристика Манхэттена
+int heuristic(int x1, int y1, int x2, int y2) {
+    return abs(x1 - x2) + abs(y1 - y2);
+}
+
+// Алгоритм A*
+bool aStar(int startX, int startY, int endX, int endY, const int(&matrix)[rows][cols], std::vector<Node>& path) {
+    std::priority_queue<Node, std::vector<Node>, std::greater<Node>> openSet;
+    std::vector<std::vector<bool>> closedSet(rows, std::vector<bool>(cols, false));
+
+    Node start{ startX, startY, 0, heuristic(startX, startY, endX, endY), nullptr };
+    openSet.push(start);
+
+    while (!openSet.empty()) {
+        Node current = openSet.top();
+        openSet.pop();
+
+        if (current.x == endX && current.y == endY) {
+            Node* node = &current;
+            while (node != nullptr) {
+                path.push_back(*node);
+                node = node->parent;
+            }
+            std::reverse(path.begin(), path.end());
+            return true; // Путь найден
+        }
+
+        closedSet[current.y][current.x] = true;
+
+        std::vector<int> directions = { -1, 0, 1, 0, 0, -1, 0, 1 }; // (dx, dy) для влево, вверх, вправо, вниз
+
+        for (size_t i = 0; i < directions.size(); i += 2) {
+            int newX = current.x + directions[i];
+            int newY = current.y + directions[i + 1];
+
+            if (isValid(newX, newY) && !closedSet[newY][newX] && matrix[newY][newX] != 1) {
+                Node neighbor{ newX, newY, current.g + 1, heuristic(newX, newY, endX, endY), new Node(current) };
+                openSet.push(neighbor);
+            }
+        }
+    }
+    return false; // Путь не найден
+}
+
+
+
+
+
+// Функция для отрисовки матрицы
 void DrawMatrix(const int(&matrix)[rows][cols]) {
-    for (i = 0; i < rows; i++) {
-        for (j = 0; j < cols; j++) {
+    for (int i = 0; i < rows; i++) {
+        for (int j = 0; j < cols; j++) {
             switch (matrix[i][j]) {
             case 1:
                 DrawRectangle(j * (cellSize + otstup), i * (cellSize + otstup), cellSize, cellSize, DARKBLUE);
@@ -60,22 +128,63 @@ void DrawMatrix(const int(&matrix)[rows][cols]) {
 
 
 
-// игра
+
 int main() {
     InitWindow(800, 600, "Game");
     SetTargetFPS(60);
 
+    // Начальные и конечные координаты
+    int startX = -1, startY = -1, endX = -1, endY = -1;
+
+    // Поиск координат для начала (2) и конца (3)
+    for (int i = 0; i < rows; i++) {
+        for (int j = 0; j < cols; j++) {
+            if (matrix1[i][j] == 2) {
+                startX = j;
+                startY = i;
+            }
+            if (matrix1[i][j] == 3) {
+                endX = j;
+                endY = i;
+            }
+        }
+    }
+
+    // Проверка, найден ли старт и финиш
+    if (startX == -1 || startY == -1 || endX == -1 || endY == -1) {
+        std::cerr << "Стартовая или конечная точка не найдена!" << std::endl;
+        CloseWindow();
+        return -1;
+    }
+
+    std::vector<Node> path; // Вектор для хранения найденного пути
+    bool foundPath = aStar(startX, startY, endX, endY, matrix1, path); // Запуск A* от (startX, startY) до (endX, endY)
+
+    if (foundPath) {
+        std::cout << "Find!" << std::endl;
+        for (const auto& node : path) {
+            std::cout << "(" << node.x << ", " << node.y << ")" << std::endl;
+        }
+    }
+    else {
+        std::cout << "NAH UH." << std::endl;
+    }
+
     while (!WindowShouldClose()) {
-
-
         BeginDrawing();
         ClearBackground(DARKGRAY);
         DrawMatrix(matrix1);
-
-
-
-
-
+        // Рисуем найденный путь
+        float offset = cellSize / 4; // смещение для центрирования
+        for (const auto& node : path) {
+            DrawRectangle(
+                node.x * (cellSize + otstup) + offset, // смещение по X
+                node.y * (cellSize + otstup) + offset, // смещение по Y
+                cellSize / 2, // ширина квадрата
+                cellSize / 2, // высота квадрата
+                GRAY
+            );
+        }
 
         EndDrawing();
     }
