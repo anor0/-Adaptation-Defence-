@@ -6,7 +6,6 @@
 #include "raylib.h"
 
 // Определение констант
-
 const int rows = 13;
 const int cols = 13;
 const int cellSize = 40;
@@ -18,11 +17,12 @@ const int otstup = 5;
 // 3 - база
 // 100 - 199 - пулемётная башня
 // 200 - 299 - ракетная башня
-// 12 _ - клетки повышеной стоимости
+// 12 - клетки повышенной стоимости
 
-const int matrix1[rows][cols] = {
-    {1,1,1,1,1,1,2,1,1,1,1,1,1},
-    {1,0,0,0,0,0,0,0,0,0,0,0,1},
+const int matrix1[rows][cols] =
+{
+    {1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1},
+    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
     {1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
     {1, 0, 1, 1, 0, 0, 1, 1, 1, 0, 0, 0, 1},
     {1, 0, 0, 1, 0, 0, 1, 1, 1, 0, 0, 0, 1},
@@ -40,7 +40,38 @@ const int matrix1[rows][cols] = {
 
 
 
-// поиск пути A*
+
+
+// Функция для отрисовки матрицы
+void DrawMatrix(const int(&matrix)[rows][cols]) {
+    for (int i = 0; i < rows; i++) {
+        for (int j = 0; j < cols; j++) {
+            switch (matrix[i][j]) {
+            case 1:
+                DrawRectangle(j * (cellSize + otstup), i * (cellSize + otstup), cellSize, cellSize, DARKBLUE);
+                break;
+            case 2:
+                DrawRectangle(j * (cellSize + otstup), i * (cellSize + otstup), cellSize, cellSize, RED);
+                break;
+            case 3:
+                DrawRectangle(j * (cellSize + otstup), i * (cellSize + otstup), cellSize, cellSize, GREEN);
+                break;
+            default:
+                DrawRectangle(j * (cellSize + otstup), i * (cellSize + otstup), cellSize, cellSize, WHITE);
+                break;
+            }
+        }
+    }
+}
+
+
+
+
+
+
+
+
+// Поиск пути A*
 struct Node {
     int x, y;
     int g, h; // g - cost от старта, h - heuristic до цели
@@ -50,9 +81,9 @@ struct Node {
     bool operator>(const Node& other) const { return f() > other.f(); }
 };
 
-// если клетка в деапозоне масива
+// Если клетка в диапазоне массива
 bool isValid(int x, int y) {
-    return x >= 0 && x < cols && y >= 0 && y < rows;
+    return x >= 0 && x < cols&& y >= 0 && y < rows;
 }
 
 // Эвристика Манхэттена
@@ -103,29 +134,57 @@ bool aStar(int startX, int startY, int endX, int endY, const int(&matrix)[rows][
 
 
 
-// Функция для отрисовки матрицы
-void DrawMatrix(const int(&matrix)[rows][cols]) {
-    for (int i = 0; i < rows; i++) {
-        for (int j = 0; j < cols; j++) {
-            switch (matrix[i][j]) {
-            case 1:
-                DrawRectangle(j * (cellSize + otstup), i * (cellSize + otstup), cellSize, cellSize, DARKBLUE);
-                break;
-            case 2:
-                DrawRectangle(j * (cellSize + otstup), i * (cellSize + otstup), cellSize, cellSize, RED);
-                break;
-            case 3:
-                DrawRectangle(j * (cellSize + otstup), i * (cellSize + otstup), cellSize, cellSize, GREEN);
-                break;
-            default:
-                DrawRectangle(j * (cellSize + otstup), i * (cellSize + otstup), cellSize, cellSize, WHITE);
-                break;
+
+
+// Класс врага
+class Enemy {
+public:
+    int x, y;
+    int speed = 1;
+    int health = 5;
+    std::vector<Node> path;
+    size_t pathIndex = 0;
+
+    // Время задержки в секундах между перемещениями врага
+    float moveDelay = 0.8f; // 0.8 секунды
+    float elapsedTime = 0.0f; // Время, прошедшее с последнего обновления
+
+    Enemy(int startX, int startY, const std::vector<Node>& foundPath)
+        : x(startX), y(startY), path(foundPath) {}
+
+    void update(float deltaTime) {
+        elapsedTime += deltaTime; // Увеличиваем время задержки
+
+        if (elapsedTime >= moveDelay && pathIndex < path.size()) {
+            Node& nextNode = path[pathIndex];
+
+            // Движение врага по всему пути
+            if (x < nextNode.x) {
+                x += speed;
             }
+            else if (x > nextNode.x) {
+                x -= speed;
+            }
+            else if (y < nextNode.y) {
+                y += speed;
+            }
+            else if (y > nextNode.y) {
+                y -= speed;
+            }
+
+            // Если враг достиг следующей клетки
+            if (x == nextNode.x && y == nextNode.y) {
+                pathIndex++;
+            }
+
+            elapsedTime = 0;
         }
     }
-}
 
-
+    bool isAtBase() {
+        return (pathIndex >= path.size()) || (x == path.back().x && y == path.back().y);
+    }
+};
 
 
 
@@ -152,7 +211,7 @@ int main() {
 
     // Проверка, найден ли старт и финиш
     if (startX == -1 || startY == -1 || endX == -1 || endY == -1) {
-        std::cerr << "Стартовая или конечная точка не найдена!" << std::endl;
+        std::cerr << "no start!" << std::endl;
         CloseWindow();
         return -1;
     }
@@ -160,29 +219,48 @@ int main() {
     std::vector<Node> path; // Вектор для хранения найденного пути
     bool foundPath = aStar(startX, startY, endX, endY, matrix1, path); // Запуск A* от (startX, startY) до (endX, endY)
 
+    Enemy enemy(startX, startY, path);
+
     if (foundPath) {
-        std::cout << "Find!" << std::endl;
-        for (const auto& node : path) {
-            std::cout << "(" << node.x << ", " << node.y << ")" << std::endl;
-        }
+        std::cout << "find!" << std::endl;
     }
     else {
-        std::cout << "NAH UH." << std::endl;
+        std::cout << "nope." << std::endl;
     }
 
     while (!WindowShouldClose()) {
+        float deltaTime = GetFrameTime(); // Время, прошедшее с последнего кадра
+
+        if (!enemy.isAtBase()) {
+            enemy.update(deltaTime); // Обновить позицию врага
+        }
+
         BeginDrawing();
         ClearBackground(DARKGRAY);
         DrawMatrix(matrix1);
+
+        
+
         // Рисуем найденный путь
         float offset = cellSize / 4; // смещение для центрирования
         for (const auto& node : path) {
             DrawRectangle(
-                node.x * (cellSize + otstup) + offset, // смещение по X
-                node.y * (cellSize + otstup) + offset, // смещение по Y
-                cellSize / 2, // ширина квадрата
-                cellSize / 2, // высота квадрата
+                node.x * (cellSize + otstup) + offset,
+                node.y * (cellSize + otstup) + offset,
+                cellSize / 2,
+                cellSize / 2,
                 GRAY
+            );
+        }
+        // Рисуем врага
+        
+        float offset1 = cellSize / 2;
+        if (!enemy.isAtBase()) {
+            DrawCircle(
+                enemy.x * (cellSize + otstup) + offset1,
+                enemy.y * (cellSize + otstup) + offset1,
+                cellSize / 4,
+                MAGENTA
             );
         }
 
