@@ -49,10 +49,10 @@ public:
     Turret(int posX, int posY) : x(posX), y(posY) {}
 
     void draw() const { // Изменил draw на константный метод
-        DrawRectangle(static_cast<int>(x * (cellSize + otstup)),
-                      static_cast<int>(y * (cellSize + otstup)),
-                      static_cast<int>(cellSize),
-                      static_cast<int>(cellSize), YELLOW);
+        DrawRectangle(static_cast<int>(x * (cellSize + otstup) + cellSize / 4),
+            static_cast<int>(y * (cellSize + otstup) + cellSize / 4),
+            static_cast<int>(cellSize/2),
+            static_cast<int>(cellSize/2), YELLOW);
     }
 
     void attack(std::vector<Enemy>& enemies);
@@ -70,7 +70,7 @@ struct Node {
 
 // Если клетка в диапазоне массива
 bool isValid(int x, int y) {
-    return x >= 0 && x < cols && y >= 0 && y < rows;
+    return x >= 0 && x < cols&& y >= 0 && y < rows;
 }
 
 // Эвристика Манхэттена
@@ -191,27 +191,27 @@ void DrawMatrix(const int(&matrix)[rows][cols]) {
             switch (matrix[i][j]) {
             case 1:
                 DrawRectangle(static_cast<int>(j * (cellSize + otstup)),
-                              static_cast<int>(i * (cellSize + otstup)),
-                              static_cast<int>(cellSize),
-                              static_cast<int>(cellSize), DARKBLUE);
+                    static_cast<int>(i * (cellSize + otstup)),
+                    static_cast<int>(cellSize),
+                    static_cast<int>(cellSize), DARKBLUE);
                 break;
             case 2:
                 DrawRectangle(static_cast<int>(j * (cellSize + otstup)),
-                              static_cast<int>(i * (cellSize + otstup)),
-                              static_cast<int>(cellSize),
-                              static_cast<int>(cellSize), RED);
+                    static_cast<int>(i * (cellSize + otstup)),
+                    static_cast<int>(cellSize),
+                    static_cast<int>(cellSize), RED);
                 break;
             case 3:
                 DrawRectangle(static_cast<int>(j * (cellSize + otstup)),
-                              static_cast<int>(i * (cellSize + otstup)),
-                              static_cast<int>(cellSize),
-                              static_cast<int>(cellSize), GREEN);
+                    static_cast<int>(i * (cellSize + otstup)),
+                    static_cast<int>(cellSize),
+                    static_cast<int>(cellSize), GREEN);
                 break;
             default:
                 DrawRectangle(static_cast<int>(j * (cellSize + otstup)),
-                              static_cast<int>(i * (cellSize + otstup)),
-                              static_cast<int>(cellSize),
-                              static_cast<int>(cellSize), WHITE);
+                    static_cast<int>(i * (cellSize + otstup)),
+                    static_cast<int>(cellSize),
+                    static_cast<int>(cellSize), WHITE);
                 break;
             }
         }
@@ -271,7 +271,8 @@ int main() {
             if (enemies[i].alive) {
                 enemies[i].update(deltaTime); // Обновить позицию живого врага
                 i++; // Увеличить индекс только для живых врагов
-            } else {
+            }
+            else {
                 enemies.erase(enemies.begin() + i); // Удалить мертвого врага
             }
         }
@@ -296,10 +297,10 @@ int main() {
         float offset = cellSize / 4; // смещение для центрирования
         for (const auto& node : path) {
             DrawRectangle(static_cast<int>(node.x * (cellSize + otstup) + offset),
-                          static_cast<int>(node.y * (cellSize + otstup) + offset),
-                          static_cast<int>(cellSize / 2),
-                          static_cast<int>(cellSize / 2),
-                          GRAY);
+                static_cast<int>(node.y * (cellSize + otstup) + offset),
+                static_cast<int>(cellSize / 2),
+                static_cast<int>(cellSize / 2),
+                GRAY);
         }
 
         // Рисуем турели
@@ -312,9 +313,9 @@ int main() {
             if (enemy.alive) { // Проверяем, жив ли враг
                 float offset1 = cellSize / 2;
                 DrawCircle(static_cast<int>(enemy.x * (cellSize + otstup) + offset1),
-                           static_cast<int>(enemy.y * (cellSize + otstup) + offset1),
-                           static_cast<int>(cellSize / 4),
-                           MAGENTA);
+                    static_cast<int>(enemy.y * (cellSize + otstup) + offset1),
+                    static_cast<int>(cellSize / 4),
+                    MAGENTA);
             }
         }
 
