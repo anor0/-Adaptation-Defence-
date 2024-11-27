@@ -36,42 +36,29 @@ const int matrix1[rows][cols] =
     {1, 1, 1, 1, 1, 1, 3, 1, 1, 1, 1, 1, 1}
 };
 
+// Впереди объявляем класс Enemy
+class Enemy;
 
+// Класс Турели
+class Turret {
+public:
+    int x, y;
+    int damage = 1;
+    int attackRadius = 2;
 
+    Turret(int posX, int posY) : x(posX), y(posY) {}
 
-
-
-
-// Функция для отрисовки матрицы
-void DrawMatrix(const int(&matrix)[rows][cols]) {
-    for (int i = 0; i < rows; i++) {
-        for (int j = 0; j < cols; j++) {
-            switch (matrix[i][j]) {
-            case 1:
-                DrawRectangle(j * (cellSize + otstup), i * (cellSize + otstup), cellSize, cellSize, DARKBLUE);
-                break;
-            case 2:
-                DrawRectangle(j * (cellSize + otstup), i * (cellSize + otstup), cellSize, cellSize, RED);
-                break;
-            case 3:
-                DrawRectangle(j * (cellSize + otstup), i * (cellSize + otstup), cellSize, cellSize, GREEN);
-                break;
-            default:
-                DrawRectangle(j * (cellSize + otstup), i * (cellSize + otstup), cellSize, cellSize, WHITE);
-                break;
-            }
-        }
+    void draw() const { // Изменил draw на константный метод
+        DrawRectangle(static_cast<int>(x * (cellSize + otstup)),
+                      static_cast<int>(y * (cellSize + otstup)),
+                      static_cast<int>(cellSize),
+                      static_cast<int>(cellSize), YELLOW);
     }
-}
 
+    void attack(std::vector<Enemy>& enemies);
+};
 
-
-
-
-
-
-
-// Поиск пути A*
+// Структура для узлов A*
 struct Node {
     int x, y;
     int g, h; // g - cost от старта, h - heuristic до цели
@@ -83,7 +70,7 @@ struct Node {
 
 // Если клетка в диапазоне массива
 bool isValid(int x, int y) {
-    return x >= 0 && x < cols&& y >= 0 && y < rows;
+    return x >= 0 && x < cols && y >= 0 && y < rows;
 }
 
 // Эвристика Манхэттена
@@ -130,18 +117,14 @@ bool aStar(int startX, int startY, int endX, int endY, const int(&matrix)[rows][
     return false; // Путь не найден
 }
 
-
-
-
-
-
-
 // Класс врага
 class Enemy {
 public:
     int x, y;
     int speed = 1;
     int health = 5;
+    bool alive = true; // Флаг живой/мертвой
+
     std::vector<Node> path;
     size_t pathIndex = 0;
 
@@ -153,6 +136,8 @@ public:
         : x(startX), y(startY), path(foundPath) {}
 
     void update(float deltaTime) {
+        if (!alive) return; // Если враг мертв, не обновляем
+
         elapsedTime += deltaTime; // Увеличиваем время задержки
 
         if (elapsedTime >= moveDelay && pathIndex < path.size()) {
@@ -186,7 +171,52 @@ public:
     }
 };
 
+// Определяем метод attack для Турелей
+void Turret::attack(std::vector<Enemy>& enemies) {
+    for (auto& enemy : enemies) {
+        int distance = abs(enemy.x - x) + abs(enemy.y - y);
+        if (distance <= attackRadius) {
+            enemy.health -= damage;
+            if (enemy.health <= 0) {
+                enemy.alive = false; // Убиваем врага
+            }
+        }
+    }
+}
 
+// Функция для отрисовки матрицы
+void DrawMatrix(const int(&matrix)[rows][cols]) {
+    for (int i = 0; i < rows; i++) {
+        for (int j = 0; j < cols; j++) {
+            switch (matrix[i][j]) {
+            case 1:
+                DrawRectangle(static_cast<int>(j * (cellSize + otstup)),
+                              static_cast<int>(i * (cellSize + otstup)),
+                              static_cast<int>(cellSize),
+                              static_cast<int>(cellSize), DARKBLUE);
+                break;
+            case 2:
+                DrawRectangle(static_cast<int>(j * (cellSize + otstup)),
+                              static_cast<int>(i * (cellSize + otstup)),
+                              static_cast<int>(cellSize),
+                              static_cast<int>(cellSize), RED);
+                break;
+            case 3:
+                DrawRectangle(static_cast<int>(j * (cellSize + otstup)),
+                              static_cast<int>(i * (cellSize + otstup)),
+                              static_cast<int>(cellSize),
+                              static_cast<int>(cellSize), GREEN);
+                break;
+            default:
+                DrawRectangle(static_cast<int>(j * (cellSize + otstup)),
+                              static_cast<int>(i * (cellSize + otstup)),
+                              static_cast<int>(cellSize),
+                              static_cast<int>(cellSize), WHITE);
+                break;
+            }
+        }
+    }
+}
 
 int main() {
     InitWindow(800, 600, "Game");
@@ -218,8 +248,10 @@ int main() {
 
     std::vector<Node> path; // Вектор для хранения найденного пути
     bool foundPath = aStar(startX, startY, endX, endY, matrix1, path); // Запуск A* от (startX, startY) до (endX, endY)
+    std::vector<Enemy> enemies; // Вектор для хранения врагов
+    enemies.emplace_back(startX, startY, path); // Создаем врага на стартовой позиции
 
-    Enemy enemy(startX, startY, path);
+    std::vector<Turret> turrets; // Вектор для хранения турелей
 
     if (foundPath) {
         std::cout << "find!" << std::endl;
@@ -231,37 +263,59 @@ int main() {
     while (!WindowShouldClose()) {
         float deltaTime = GetFrameTime(); // Время, прошедшее с последнего кадра
 
-        if (!enemy.isAtBase()) {
-            enemy.update(deltaTime); // Обновить позицию врага
+        for (auto& turret : turrets) {
+            turret.attack(enemies); // Турели атакуют врагов
+        }
+
+        for (size_t i = 0; i < enemies.size(); ) {
+            if (enemies[i].alive) {
+                enemies[i].update(deltaTime); // Обновить позицию живого врага
+                i++; // Увеличить индекс только для живых врагов
+            } else {
+                enemies.erase(enemies.begin() + i); // Удалить мертвого врага
+            }
+        }
+
+        // Обработка ввода для установки турелей
+        if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) {
+            Vector2 mousePos = GetMousePosition();
+            int gridX = static_cast<int>(mousePos.x / (cellSize + otstup));
+            int gridY = static_cast<int>(mousePos.y / (cellSize + otstup));
+
+            // Проверка, что клик был в границах и на клетке 1
+            if (isValid(gridX, gridY) && matrix1[gridY][gridX] == 1) {
+                turrets.emplace_back(gridX, gridY);
+            }
         }
 
         BeginDrawing();
         ClearBackground(DARKGRAY);
         DrawMatrix(matrix1);
 
-        
-
         // Рисуем найденный путь
         float offset = cellSize / 4; // смещение для центрирования
         for (const auto& node : path) {
-            DrawRectangle(
-                node.x * (cellSize + otstup) + offset,
-                node.y * (cellSize + otstup) + offset,
-                cellSize / 2,
-                cellSize / 2,
-                GRAY
-            );
+            DrawRectangle(static_cast<int>(node.x * (cellSize + otstup) + offset),
+                          static_cast<int>(node.y * (cellSize + otstup) + offset),
+                          static_cast<int>(cellSize / 2),
+                          static_cast<int>(cellSize / 2),
+                          GRAY);
         }
-        // Рисуем врага
-        
-        float offset1 = cellSize / 2;
-        if (!enemy.isAtBase()) {
-            DrawCircle(
-                enemy.x * (cellSize + otstup) + offset1,
-                enemy.y * (cellSize + otstup) + offset1,
-                cellSize / 4,
-                MAGENTA
-            );
+
+        // Рисуем турели
+        for (const auto& turret : turrets) {
+            turret.draw();
+        }
+
+        // Рисуем врагов
+        for (const auto& enemy : enemies) {
+            if (enemy.alive) { // Проверяем, жив ли враг
+                float offset1 = cellSize / 2;
+                DrawCircle(static_cast<int>(enemy.x * (cellSize + otstup) + offset1),
+                           static_cast<int>(enemy.y * (cellSize + otstup) + offset1),
+                           static_cast<int>(cellSize / 4),
+                           MAGENTA);
+            }
         }
 
         EndDrawing();
