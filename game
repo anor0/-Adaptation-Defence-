@@ -3,7 +3,7 @@
 #include <queue>
 #include <algorithm>
 #include <cmath>
-#include <string> // Подключение для работы со строками
+#include <string>
 #include "raylib.h"
 
 // Определение констант
@@ -59,6 +59,7 @@ public:
 
     void attack(std::vector<Enemy>& enemies, float deltaTime);
 };
+
 
 // Структура для узлов A*
 struct Node {
@@ -255,6 +256,8 @@ int main() {
         }
     }
 
+
+
     // Проверка, найден ли старт и финиш
     if (startX == -1 || startY == -1 || endX == -1 || endY == -1) {
         std::cerr << "no start!" << std::endl;
@@ -280,6 +283,9 @@ int main() {
         std::cout << "nope." << std::endl;
     }
 
+
+
+
     while (!WindowShouldClose()) {
         float deltaTime = GetFrameTime(); // Время, прошедшее с последнего кадра
 
@@ -297,11 +303,17 @@ int main() {
             }
         }
 
+
+
+
         // Если все враги мертвы, начинаем следующую волну
         if (enemies.empty()) {
             waveNumber++; // Увеличиваем номер волны
             wave(enemies, waveNumber, path); // Запускаем следующую волну
         }
+
+
+
 
         // Обработка ввода для установки или удаления турелей
         if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) {
@@ -329,6 +341,9 @@ int main() {
             }
         }
 
+
+
+
         BeginDrawing();
         ClearBackground(DARKGRAY);
         DrawMatrix(matrix1);
@@ -343,10 +358,16 @@ int main() {
                 GRAY);
         }
 
+
+
+
         // Рисуем турели
         for (const auto& turret : turrets) {
             turret.draw();
         }
+
+
+
 
         // Рисуем врагов
         for (const auto& enemy : enemies) {
@@ -359,11 +380,17 @@ int main() {
             }
         }
 
+
+
+
         // Отображаем счётчик турелей
         DrawText(("Turrets: " + std::to_string(turrets.size())).c_str(), 600, 10, 20, WHITE);
 
         // Отображаем номер текущей волны
         DrawText(("Wawe: " + std::to_string(waveNumber)).c_str(), 600, 40, 20, WHITE);
+
+
+
 
         EndDrawing();
     }
