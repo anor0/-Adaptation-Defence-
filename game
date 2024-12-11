@@ -17,7 +17,6 @@ const int otstup = 5;
 // 3 - база
 // 100 - 199 - пулемётная башня
 // 200 - 299 - ракетная башня
-// 12 - клетки повышенной стоимости
 
 const int matrix1[rows][cols] =
 {
@@ -39,23 +38,25 @@ const int matrix1[rows][cols] =
 // Впереди объявляем класс Enemy
 class Enemy;
 
-// Класс Турели
+// Класс Турелей
 class Turret {
 public:
     int x, y;
     int damage = 1;
     int attackRadius = 2;
+    float atkspeed = 0.5f; // Задержка между атаками
+    float attackCooldown = 0.0f; // Время, прошедшее с последней атаки
 
     Turret(int posX, int posY) : x(posX), y(posY) {}
 
-    void draw() const { // Изменил draw на константный метод
+    void draw() const {
         DrawRectangle(static_cast<int>(x * (cellSize + otstup) + cellSize / 4),
             static_cast<int>(y * (cellSize + otstup) + cellSize / 4),
-            static_cast<int>(cellSize/2),
-            static_cast<int>(cellSize/2), YELLOW);
+            static_cast<int>(cellSize / 2),
+            static_cast<int>(cellSize / 2), YELLOW);
     }
 
-    void attack(std::vector<Enemy>& enemies);
+    void attack(std::vector<Enemy>& enemies, float deltaTime);
 };
 
 // Структура для узлов A*
@@ -171,16 +172,21 @@ public:
     }
 };
 
-// Определяем метод attack для Турелей
-void Turret::attack(std::vector<Enemy>& enemies) {
-    for (auto& enemy : enemies) {
-        int distance = abs(enemy.x - x) + abs(enemy.y - y);
-        if (distance <= attackRadius) {
-            enemy.health -= damage;
-            if (enemy.health <= 0) {
-                enemy.alive = false; // Убиваем врага
+// Реализация метода attack с учётом задержки
+void Turret::attack(std::vector<Enemy>& enemies, float deltaTime) {
+    attackCooldown -= deltaTime; // Уменьшаем таймер
+
+    if (attackCooldown <= 0) { // Если прошла задержка
+        for (auto& enemy : enemies) {
+            int distance = abs(enemy.x - x) + abs(enemy.y - y);
+            if (distance <= attackRadius) {
+                enemy.health -= damage;
+                if (enemy.health <= 0) {
+                    enemy.alive = false; // Убиваем врага
+                }
             }
         }
+        attackCooldown = atkspeed; // Сброс таймера
     }
 }
 
@@ -252,6 +258,7 @@ int main() {
     enemies.emplace_back(startX, startY, path); // Создаем врага на стартовой позиции
 
     std::vector<Turret> turrets; // Вектор для хранения турелей
+    const int maxTurrets = 4; // Максимальное количество турелей
 
     if (foundPath) {
         std::cout << "find!" << std::endl;
@@ -264,7 +271,7 @@ int main() {
         float deltaTime = GetFrameTime(); // Время, прошедшее с последнего кадра
 
         for (auto& turret : turrets) {
-            turret.attack(enemies); // Турели атакуют врагов
+            turret.attack(enemies, deltaTime); // Турели атакуют врагов
         }
 
         for (size_t i = 0; i < enemies.size(); ) {
@@ -283,8 +290,8 @@ int main() {
             int gridX = static_cast<int>(mousePos.x / (cellSize + otstup));
             int gridY = static_cast<int>(mousePos.y / (cellSize + otstup));
 
-            // Проверка, что клик был в границах и на клетке 1
-            if (isValid(gridX, gridY) && matrix1[gridY][gridX] == 1) {
+            // Проверка на количество турелей и что клик был в границах и на клетке 1
+            if (turrets.size() < maxTurrets && isValid(gridX, gridY) && matrix1[gridY][gridX] == 1) {
                 turrets.emplace_back(gridX, gridY);
             }
         }
