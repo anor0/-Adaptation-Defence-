@@ -3,6 +3,7 @@
 #include <queue>
 #include <algorithm>
 #include <cmath>
+#include <string> // Подключение для работы со строками
 #include "raylib.h"
 
 // Определение констант
@@ -224,6 +225,15 @@ void DrawMatrix(const int(&matrix)[rows][cols]) {
     }
 }
 
+// Функция для инициализации новой волны врагов
+void wave(std::vector<Enemy>& enemies, int waveNumber, const std::vector<Node>& path) {
+    int enemiesInWave = waveNumber + 1; // Увеличиваем количество врагов на 1 в каждой волне
+
+    for (int i = 0; i < enemiesInWave; i++) {
+        enemies.emplace_back(6, 0, path); // Добавляем новых врагов на стартовой позиции
+    }
+}
+
 int main() {
     InitWindow(800, 600, "Game");
     SetTargetFPS(60);
@@ -254,8 +264,11 @@ int main() {
 
     std::vector<Node> path; // Вектор для хранения найденного пути
     bool foundPath = aStar(startX, startY, endX, endY, matrix1, path); // Запуск A* от (startX, startY) до (endX, endY)
+
     std::vector<Enemy> enemies; // Вектор для хранения врагов
-    enemies.emplace_back(startX, startY, path); // Создаем врага на стартовой позиции
+    int waveNumber = 0; // Текущая волна
+
+    wave(enemies, waveNumber, path); // Запуск первой волны
 
     std::vector<Turret> turrets; // Вектор для хранения турелей
     const int maxTurrets = 4; // Максимальное количество турелей
@@ -284,15 +297,35 @@ int main() {
             }
         }
 
-        // Обработка ввода для установки турелей
+        // Если все враги мертвы, начинаем следующую волну
+        if (enemies.empty()) {
+            waveNumber++; // Увеличиваем номер волны
+            wave(enemies, waveNumber, path); // Запускаем следующую волну
+        }
+
+        // Обработка ввода для установки или удаления турелей
         if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) {
             Vector2 mousePos = GetMousePosition();
             int gridX = static_cast<int>(mousePos.x / (cellSize + otstup));
             int gridY = static_cast<int>(mousePos.y / (cellSize + otstup));
 
             // Проверка на количество турелей и что клик был в границах и на клетке 1
-            if (turrets.size() < maxTurrets && isValid(gridX, gridY) && matrix1[gridY][gridX] == 1) {
-                turrets.emplace_back(gridX, gridY);
+            if (isValid(gridX, gridY)) {
+                bool turretFound = false;
+
+                // Проверка на существование турели по координатам
+                for (size_t i = 0; i < turrets.size(); ++i) {
+                    if (turrets[i].x == gridX && turrets[i].y == gridY) {
+                        turrets.erase(turrets.begin() + i); // Удаляем турель
+                        turretFound = true;
+                        break;
+                    }
+                }
+
+                // Если турели не найдено, добавляем новую
+                if (!turretFound && turrets.size() < maxTurrets && matrix1[gridY][gridX] == 1) {
+                    turrets.emplace_back(gridX, gridY);
+                }
             }
         }
 
@@ -325,6 +358,12 @@ int main() {
                     MAGENTA);
             }
         }
+
+        // Отображаем счётчик турелей
+        DrawText(("Turrets: " + std::to_string(turrets.size())).c_str(), 600, 10, 20, WHITE);
+
+        // Отображаем номер текущей волны
+        DrawText(("Wawe: " + std::to_string(waveNumber)).c_str(), 600, 40, 20, WHITE);
 
         EndDrawing();
     }
