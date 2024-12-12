@@ -13,7 +13,7 @@ const int cellSize = 40;
 const int otstup = 5;
 
 // 0 - 99 ландшафт
-// 1 - невозможно пройти 
+// 1 - невозможно пройти
 // 2 - спавнер
 // 3 - база
 // 100 - 199 - пулемётная башня
@@ -68,7 +68,11 @@ struct Node {
     Node* parent;
 
     int f() const { return g + h; } // общая стоимость
+
     bool operator>(const Node& other) const { return f() > other.f(); }
+    bool operator==(const Node& other) const { // Добавляем оператор сравнения
+        return x == other.x && y == other.y && g == other.g && h == other.h;
+    }
 };
 
 // Если клетка в диапазоне массива
@@ -81,8 +85,24 @@ int heuristic(int x1, int y1, int x2, int y2) {
     return abs(x1 - x2) + abs(y1 - y2);
 }
 
+// Функция для обозначения зарезервированных клеток, находящихся под атакой турелей
+void markAttackRadius(const std::vector<Turret>& turrets, std::vector<std::vector<bool>>& reservedCells) {
+    for (const auto& turret : turrets) {
+        for (int dy = -turret.attackRadius; dy <= turret.attackRadius; ++dy) {
+            for (int dx = -turret.attackRadius; dx <= turret.attackRadius; ++dx) {
+                int newX = turret.x + dx;
+                int newY = turret.y + dy;
+                // Проверка на валидность и пределах радиуса
+                if (isValid(newX, newY) && (abs(dx) + abs(dy) <= turret.attackRadius)) {
+                    reservedCells[newY][newX] = true; // Обозначаем клетку как зарезервированную
+                }
+            }
+        }
+    }
+}
+
 // Алгоритм A*
-bool aStar(int startX, int startY, int endX, int endY, const int(&matrix)[rows][cols], std::vector<Node>& path) {
+bool aStar(int startX, int startY, int endX, int endY, const int(&matrix)[rows][cols], const std::vector<std::vector<bool>>& reservedCells, std::vector<Node>& path) {
     std::priority_queue<Node, std::vector<Node>, std::greater<Node>> openSet;
     std::vector<std::vector<bool>> closedSet(rows, std::vector<bool>(cols, false));
 
@@ -111,7 +131,7 @@ bool aStar(int startX, int startY, int endX, int endY, const int(&matrix)[rows][
             int newX = current.x + directions[i];
             int newY = current.y + directions[i + 1];
 
-            if (isValid(newX, newY) && !closedSet[newY][newX] && matrix[newY][newX] != 1) {
+            if (isValid(newX, newY) && !closedSet[newY][newX] && matrix[newY][newX] != 1 && !reservedCells[newY][newX]) {
                 Node neighbor{ newX, newY, current.g + 1, heuristic(newX, newY, endX, endY), new Node(current) };
                 openSet.push(neighbor);
             }
@@ -256,8 +276,6 @@ int main() {
         }
     }
 
-
-
     // Проверка, найден ли старт и финиш
     if (startX == -1 || startY == -1 || endX == -1 || endY == -1) {
         std::cerr << "no start!" << std::endl;
@@ -266,27 +284,42 @@ int main() {
     }
 
     std::vector<Node> path; // Вектор для хранения найденного пути
-    bool foundPath = aStar(startX, startY, endX, endY, matrix1, path); // Запуск A* от (startX, startY) до (endX, endY)
+    std::vector<Node> previousPath; // Вектор для хранения предыдущего пути
+    std::vector<std::vector<bool>> reservedCells(rows, std::vector<bool>(cols, false));
 
     std::vector<Enemy> enemies; // Вектор для хранения врагов
     int waveNumber = 0; // Текущая волна
 
-    wave(enemies, waveNumber, path); // Запуск первой волны
-
     std::vector<Turret> turrets; // Вектор для хранения турелей
     const int maxTurrets = 4; // Максимальное количество турелей
 
-    if (foundPath) {
-        std::cout << "find!" << std::endl;
-    }
-    else {
-        std::cout << "nope." << std::endl;
-    }
-
-
-
-
     while (!WindowShouldClose()) {
+        // Создание новой волны врагов при отсутствии врагов
+        if (enemies.empty()) {
+            reservedCells = std::vector<std::vector<bool>>(rows, std::vector<bool>(cols, false)); // Сброс ячеек
+            markAttackRadius(turrets, reservedCells); // Помечаем клетки, находящиеся в радиусе атаки турелей
+
+            // Пересчитываем путь после установки турелей
+            previousPath = path; // Сохраняем предыдущий путь для проверки изменений
+            path.clear(); // Очищаем старый путь
+            bool foundPath = aStar(startX, startY, endX, endY, matrix1, reservedCells, path); // Запуск A* с учетом зарезервированных клеток
+
+            if (foundPath) {
+                if (path != previousPath) { // Проверка, изменился ли маршрут
+                    std::cout << "Новый маршрут найден!" << std::endl;
+                }
+                else {
+                    std::cout << "Маршрут не изменился." << std::endl;
+                }
+                wave(enemies, waveNumber, path); // Запускаем новую волну с новым путем
+                waveNumber++; // Увеличиваем номер волны
+            }
+            else {
+                std::cout << "Нет пути." << std::endl;
+                break; // Выход из цикла, если путь не найден
+            }
+        }
+
         float deltaTime = GetFrameTime(); // Время, прошедшее с последнего кадра
 
         for (auto& turret : turrets) {
@@ -302,18 +335,6 @@ int main() {
                 enemies.erase(enemies.begin() + i); // Удалить мертвого врага
             }
         }
-
-
-
-
-        // Если все враги мертвы, начинаем следующую волну
-        if (enemies.empty()) {
-            waveNumber++; // Увеличиваем номер волны
-            wave(enemies, waveNumber, path); // Запускаем следующую волну
-        }
-
-
-
 
         // Обработка ввода для установки или удаления турелей
         if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) {
@@ -341,9 +362,6 @@ int main() {
             }
         }
 
-
-
-
         BeginDrawing();
         ClearBackground(DARKGRAY);
         DrawMatrix(matrix1);
@@ -358,16 +376,10 @@ int main() {
                 GRAY);
         }
 
-
-
-
         // Рисуем турели
         for (const auto& turret : turrets) {
             turret.draw();
         }
-
-
-
 
         // Рисуем врагов
         for (const auto& enemy : enemies) {
@@ -380,21 +392,13 @@ int main() {
             }
         }
 
-
-
-
         // Отображаем счётчик турелей
         DrawText(("Turrets: " + std::to_string(turrets.size())).c_str(), 600, 10, 20, WHITE);
-
         // Отображаем номер текущей волны
-        DrawText(("Wawe: " + std::to_string(waveNumber)).c_str(), 600, 40, 20, WHITE);
-
-
-
+        DrawText(("Wave: " + std::to_string(waveNumber)).c_str(), 600, 40, 20, WHITE);
 
         EndDrawing();
     }
-
     CloseWindow();
     return 0;
 }
