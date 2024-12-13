@@ -106,7 +106,6 @@ bool isValid(int x, int y) {
 int heuristic(int x1, int y1, int x2, int y2) {
     return abs(x1 - x2) + abs(y1 - y2);
 }
-
 // Функция для обозначения зарезервированных клеток, находящихся под атакой турелей
 void markAttackRadius(const std::vector<Turret>& turrets, std::vector<std::vector<bool>>& reservedCells) {
     for (const auto& turret : turrets) {
@@ -181,34 +180,7 @@ public:
     Enemy(int startX, int startY, const std::vector<Node>& foundPath, int enemyID, int enemyHealth)
         : x(startX), y(startY), path(foundPath), id(enemyID), health(enemyHealth), maxHealth(enemyHealth) {}
 
-    void update(float deltaTime, const std::vector<Enemy>& enemies) {
-        if (!alive) return;
-
-        if (!canMove) {
-            bool allowMove = true;
-            for (const auto& e : enemies) {
-                if (e.id < id && e.x == path[0].x && e.y == path[0].y) {
-                    allowMove = false;
-                    break;
-                }
-            }
-            if (allowMove) canMove = true;
-        }
-
-        if (canMove && elapsedTime >= moveDelay && pathIndex < path.size()) {
-            Node& nextNode = path[pathIndex];
-            if (x < nextNode.x) { x += speed; }
-            else if (x > nextNode.x) { x -= speed; }
-            else if (y < nextNode.y) { y += speed; }
-            else if (y > nextNode.y) { y -= speed; }
-
-            if (x == nextNode.x && y == nextNode.y) { pathIndex++; }
-            elapsedTime = 0;
-        }
-        else if (canMove) {
-            elapsedTime += deltaTime;
-        }
-    }
+    void update(float deltaTime, const std::vector<Enemy>& enemies);
 
     int distanceToBase(int baseX, int baseY) const {
         return abs(x - baseX) + abs(y - baseY);
@@ -315,15 +287,17 @@ int main() {
 
     std::vector<Turret> turrets;
 
-    // Переменная для отслеживания игры
-    bool gameOver = false;
+    int baseHealth = 3; // Add base health
+    bool gameOver = false; // Add game over flag
+    bool gameLost = false;
 
     while (!WindowShouldClose()) {
         float deltaTime = GetFrameTime();
         spawnTimer += deltaTime;
 
+
+
         // Проверка на GAME OVER
-        bool gameLost = false;
         for (const auto& enemy : enemies) {
             if (enemy.alive && enemy.x == endX && enemy.y == endY) {
                 gameLost = true;
@@ -428,19 +402,41 @@ int main() {
             DrawText(("Turrets: " + std::to_string(turrets.size())).c_str(), 600, 10, 20, WHITE);
             DrawText(("Wave: " + std::to_string(waveNumber)).c_str(), 600, 40, 20, WHITE);
         }
-
-        // Отображение сообщения "YOU LOOSE" в центре экрана
+        // Отображение сообщения "YOU LOOSE" и кнопки "Restart"
         if (gameOver) {
-            const char* message = "YOU LOOSE";
-            int fontSize = 80; // Размер шрифта
-            int textWidth = MeasureText(message, fontSize); // Измеряем ширину текста
-            int textHeight = fontSize; // Высота текста
+            const char* loseMessage = "YOU LOOSE";
+            const char* restartMessage = "Restart";
+            int fontSizeLose = 80;
+            int fontSizeRestart = 30;
 
-            // Центрируем текст по ширине и высоте окна
-            int x = (GetScreenWidth() - textWidth) / 2;
-            int y = (GetScreenHeight() - textHeight) / 2;
+            int loseTextWidth = MeasureText(loseMessage, fontSizeLose);
+            int loseTextHeight = fontSizeLose;
+            int restartTextWidth = MeasureText(restartMessage, fontSizeRestart);
+            int restartTextHeight = fontSizeRestart;
 
-            DrawText(message, x, y, fontSize, RED);
+
+            int xLose = (GetScreenWidth() - loseTextWidth) / 2;
+            int yLose = (GetScreenHeight() - loseTextHeight) / 2 - loseTextHeight / 2; // Adjusted y position
+            DrawText(loseMessage, xLose, yLose, fontSizeLose, RED);
+
+
+            int xRestart = (GetScreenWidth() - restartTextWidth) / 2;
+            int yRestart = yLose + loseTextHeight; // Restart button below YOU LOOSE
+            DrawRectangle(xRestart - 10, yRestart - 5, restartTextWidth + 20, restartTextHeight + 10, GREEN); //Added rectangle
+            DrawText(restartMessage, xRestart, yRestart, fontSizeRestart, BLACK);
+
+
+            Rectangle restartButton = { xRestart - 10, yRestart - 5, restartTextWidth + 20, restartTextHeight + 10 }; // Define button rect
+            if (CheckCollisionPointRec(GetMousePosition(), restartButton) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                // Reset game state
+                gameOver = false;
+                gameLost = false;
+                enemies.clear();
+                waveNumber = 0;
+                spawnTimer = 0.0f;
+                baseHealth = 3;
+                turrets.clear();
+            }
         }
 
         EndDrawing();
@@ -448,4 +444,33 @@ int main() {
 
     CloseWindow();
     return 0;
+}
+
+void Enemy::update(float deltaTime, const std::vector<Enemy>& enemies) {
+    if (!alive) return;
+
+    if (!canMove) {
+        bool allowMove = true;
+        for (const auto& e : enemies) {
+            if (e.id < id && e.x == path[0].x && e.y == path[0].y) {
+                allowMove = false;
+                break;
+            }
+        }
+        if (allowMove) canMove = true;
+    }
+
+    if (canMove && elapsedTime >= moveDelay && pathIndex < path.size()) {
+        Node& nextNode = path[pathIndex];
+        if (x < nextNode.x) { x += speed; }
+        else if (x > nextNode.x) { x -= speed; }
+        else if (y < nextNode.y) { y += speed; }
+        else if (y > nextNode.y) { y -= speed; }
+
+        if (x == nextNode.x && y == nextNode.y) { pathIndex++; }
+        elapsedTime = 0;
+    }
+    else if (canMove) {
+        elapsedTime += deltaTime;
+    }
 }
