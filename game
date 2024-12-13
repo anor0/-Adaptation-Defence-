@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cmath>
 #include <string>
+#include <limits> // for numeric_limits
 #include "raylib.h"
 
 // Определение констант
@@ -12,12 +13,10 @@ const int cols = 13;
 const int cellSize = 40;
 const int otstup = 5;
 
-// 0 - 99 ландшафт
-// 1 - невозможно пройти
+// 0 - проходимая клетка
+// 1 - стена
 // 2 - спавнер
 // 3 - база
-// 100 - 199 - пулемётная башня
-// 200 - 299 - ракетная башня
 
 const int matrix1[rows][cols] =
 {
@@ -60,7 +59,6 @@ public:
     void attack(std::vector<Enemy>& enemies, float deltaTime);
 };
 
-
 // Структура для узлов A*
 struct Node {
     int x, y;
@@ -70,7 +68,7 @@ struct Node {
     int f() const { return g + h; } // общая стоимость
 
     bool operator>(const Node& other) const { return f() > other.f(); }
-    bool operator==(const Node& other) const { // Добавляем оператор сравнения
+    bool operator==(const Node& other) const {
         return x == other.x && y == other.y && g == other.g && h == other.h;
     }
 };
@@ -94,7 +92,7 @@ void markAttackRadius(const std::vector<Turret>& turrets, std::vector<std::vecto
                 int newY = turret.y + dy;
                 // Проверка на валидность и пределах радиуса
                 if (isValid(newX, newY) && (abs(dx) + abs(dy) <= turret.attackRadius)) {
-                    reservedCells[newY][newX] = true; // Обозначаем клетку как зарезервированную
+                    reservedCells[newY][newX] = true;
                 }
             }
         }
@@ -120,12 +118,11 @@ bool aStar(int startX, int startY, int endX, int endY, const int(&matrix)[rows][
                 node = node->parent;
             }
             std::reverse(path.begin(), path.end());
-            return true; // Путь найден
+            return true;
         }
 
         closedSet[current.y][current.x] = true;
-
-        std::vector<int> directions = { -1, 0, 1, 0, 0, -1, 0, 1 }; // (dx, dy) для влево, вверх, вправо, вниз
+        std::vector<int> directions = { -1, 0, 1, 0, 0, -1, 0, 1 };
 
         for (size_t i = 0; i < directions.size(); i += 2) {
             int newX = current.x + directions[i];
@@ -137,7 +134,7 @@ bool aStar(int startX, int startY, int endX, int endY, const int(&matrix)[rows][
             }
         }
     }
-    return false; // Путь не найден
+    return false;
 }
 
 // Класс врага
@@ -146,216 +143,204 @@ public:
     int x, y;
     int speed = 1;
     int health = 5;
-    bool alive = true; // Флаг живой/мертвой
+    bool alive = true;
+    int id;
+    bool canMove = false;
 
     std::vector<Node> path;
     size_t pathIndex = 0;
 
-    // Время задержки в секундах между перемещениями врага
-    float moveDelay = 0.8f; // 0.8 секунды
-    float elapsedTime = 0.0f; // Время, прошедшее с последнего обновления
+    float moveDelay = 0.8f;
+    float elapsedTime = 0.0f;
 
-    Enemy(int startX, int startY, const std::vector<Node>& foundPath)
-        : x(startX), y(startY), path(foundPath) {}
+    Enemy(int startX, int startY, const std::vector<Node>& foundPath, int enemyID)
+        : x(startX), y(startY), path(foundPath), id(enemyID) {}
 
-    void update(float deltaTime) {
-        if (!alive) return; // Если враг мертв, не обновляем
+    void update(float deltaTime, const std::vector<Enemy>& enemies) {
+        if (!alive) return;
 
-        elapsedTime += deltaTime; // Увеличиваем время задержки
+        if (!canMove) {
+            bool allowMove = true;
+            for (const auto& e : enemies) {
+                if (e.id < id && e.x == path[0].x && e.y == path[0].y) {
+                    allowMove = false;
+                    break;
+                }
+            }
+            if (allowMove) canMove = true;
+        }
 
-        if (elapsedTime >= moveDelay && pathIndex < path.size()) {
+        if (canMove && elapsedTime >= moveDelay && pathIndex < path.size()) {
             Node& nextNode = path[pathIndex];
+            if (x < nextNode.x) { x += speed; }
+            else if (x > nextNode.x) { x -= speed; }
+            else if (y < nextNode.y) { y += speed; }
+            else if (y > nextNode.y) { y -= speed; }
 
-            // Движение врага по всему пути
-            if (x < nextNode.x) {
-                x += speed;
-            }
-            else if (x > nextNode.x) {
-                x -= speed;
-            }
-            else if (y < nextNode.y) {
-                y += speed;
-            }
-            else if (y > nextNode.y) {
-                y -= speed;
-            }
-
-            // Если враг достиг следующей клетки
-            if (x == nextNode.x && y == nextNode.y) {
-                pathIndex++;
-            }
-
+            if (x == nextNode.x && y == nextNode.y) { pathIndex++; }
             elapsedTime = 0;
+        }
+        else if (canMove) {
+            elapsedTime += deltaTime;
         }
     }
 
-    bool isAtBase() {
-        return (pathIndex >= path.size()) || (x == path.back().x && y == path.back().y);
+    int distanceToBase(int baseX, int baseY) const {
+        return abs(x - baseX) + abs(y - baseY);
     }
 };
 
-// Реализация метода attack с учётом задержки
+// Реализация метода attack с учётом задержки и приоритета
 void Turret::attack(std::vector<Enemy>& enemies, float deltaTime) {
-    attackCooldown -= deltaTime; // Уменьшаем таймер
+    attackCooldown -= deltaTime;
 
-    if (attackCooldown <= 0) { // Если прошла задержка
+    if (attackCooldown <= 0) {
+        Enemy* closestEnemy = nullptr;
+        int closestDistance = std::numeric_limits<int>::max();
+
         for (auto& enemy : enemies) {
-            int distance = abs(enemy.x - x) + abs(enemy.y - y);
-            if (distance <= attackRadius) {
-                enemy.health -= damage;
-                if (enemy.health <= 0) {
-                    enemy.alive = false; // Убиваем врага
+            if (enemy.alive) {
+                int distance = abs(enemy.x - x) + abs(enemy.y - y);
+                if (distance <= attackRadius) {
+                    int distToBase = enemy.distanceToBase(matrix1[rows - 1][cols / 2], rows - 1);
+                    if (distToBase < closestDistance) {
+                        closestDistance = distToBase;
+                        closestEnemy = &enemy;
+                    }
                 }
             }
         }
-        attackCooldown = atkspeed; // Сброс таймера
+
+        if (closestEnemy) {
+            closestEnemy->health -= damage;
+            if (closestEnemy->health <= 0) {
+                closestEnemy->alive = false;
+            }
+        }
+        attackCooldown = atkspeed;
     }
 }
-
 // Функция для отрисовки матрицы
 void DrawMatrix(const int(&matrix)[rows][cols]) {
     for (int i = 0; i < rows; i++) {
         for (int j = 0; j < cols; j++) {
+            Color color;
             switch (matrix[i][j]) {
-            case 1:
-                DrawRectangle(static_cast<int>(j * (cellSize + otstup)),
-                    static_cast<int>(i * (cellSize + otstup)),
-                    static_cast<int>(cellSize),
-                    static_cast<int>(cellSize), DARKBLUE);
-                break;
-            case 2:
-                DrawRectangle(static_cast<int>(j * (cellSize + otstup)),
-                    static_cast<int>(i * (cellSize + otstup)),
-                    static_cast<int>(cellSize),
-                    static_cast<int>(cellSize), RED);
-                break;
-            case 3:
-                DrawRectangle(static_cast<int>(j * (cellSize + otstup)),
-                    static_cast<int>(i * (cellSize + otstup)),
-                    static_cast<int>(cellSize),
-                    static_cast<int>(cellSize), GREEN);
-                break;
-            default:
-                DrawRectangle(static_cast<int>(j * (cellSize + otstup)),
-                    static_cast<int>(i * (cellSize + otstup)),
-                    static_cast<int>(cellSize),
-                    static_cast<int>(cellSize), WHITE);
-                break;
+            case 0: color = WHITE; break;
+            case 1: color = DARKBLUE; break;
+            case 2: color = RED; break;
+            case 3: color = GREEN; break;
+            default: color = GRAY; break;
+            }
+            DrawRectangle(static_cast<int>(j * (cellSize + otstup)),
+                static_cast<int>(i * (cellSize + otstup)),
+                cellSize, cellSize, color);
+        }
+    }
+}
+
+// Функция для инициализации новой волны врагов с задержкой и правильным спавном
+void wave(std::vector<Enemy>& enemies, int waveNumber, const std::vector<Node>& path, float enemySpawnDelay) {
+    int enemiesInWave = 1 + (waveNumber / 3);
+    int startX = 6;
+    int startY = 0;
+
+    for (int i = 0; i < enemiesInWave; i++) {
+        enemies.emplace_back(startX, startY, path, i); // Pass enemy ID
+        if (i < enemiesInWave - 1) {
+            double startTime = GetTime();
+            while (GetTime() - startTime < enemySpawnDelay && !WindowShouldClose()) {
+                // Keep the game responsive during the wait
             }
         }
     }
 }
 
-// Функция для инициализации новой волны врагов
-void wave(std::vector<Enemy>& enemies, int waveNumber, const std::vector<Node>& path) {
-    int enemiesInWave = waveNumber + 1; // Увеличиваем количество врагов на 1 в каждой волне
-
-    for (int i = 0; i < enemiesInWave; i++) {
-        enemies.emplace_back(6, 0, path); // Добавляем новых врагов на стартовой позиции
-    }
-}
 
 int main() {
     InitWindow(800, 600, "Game");
     SetTargetFPS(60);
 
-    // Начальные и конечные координаты
     int startX = -1, startY = -1, endX = -1, endY = -1;
 
-    // Поиск координат для начала (2) и конца (3)
     for (int i = 0; i < rows; i++) {
         for (int j = 0; j < cols; j++) {
-            if (matrix1[i][j] == 2) {
-                startX = j;
-                startY = i;
-            }
-            if (matrix1[i][j] == 3) {
-                endX = j;
-                endY = i;
-            }
+            if (matrix1[i][j] == 2) { startX = j; startY = i; }
+            if (matrix1[i][j] == 3) { endX = j; endY = i; }
         }
     }
 
-    // Проверка, найден ли старт и финиш
     if (startX == -1 || startY == -1 || endX == -1 || endY == -1) {
-        std::cerr << "no start!" << std::endl;
+        std::cerr << "Error: Start or end point not found!" << std::endl;
         CloseWindow();
         return -1;
     }
 
-    std::vector<Node> path; // Вектор для хранения найденного пути
-    std::vector<Node> previousPath; // Вектор для хранения предыдущего пути
+    std::vector<Node> path;
+    std::vector<Node> previousPath;
     std::vector<std::vector<bool>> reservedCells(rows, std::vector<bool>(cols, false));
 
-    std::vector<Enemy> enemies; // Вектор для хранения врагов
-    int waveNumber = 0; // Текущая волна
+    std::vector<Enemy> enemies;
+    int waveNumber = 0;
+    const int maxTurrets = 4;
+    float spawnDelay = 1.0f;
+    float spawnTimer = 0.0f;
+    float enemySpawnDelay = 0.2f; // Delay between spawning enemies (in seconds)
 
-    std::vector<Turret> turrets; // Вектор для хранения турелей
-    const int maxTurrets = 4; // Максимальное количество турелей
+    std::vector<Turret> turrets;
 
     while (!WindowShouldClose()) {
-        // Создание новой волны врагов при отсутствии врагов
-        if (enemies.empty()) {
-            reservedCells = std::vector<std::vector<bool>>(rows, std::vector<bool>(cols, false)); // Сброс ячеек
-            markAttackRadius(turrets, reservedCells); // Помечаем клетки, находящиеся в радиусе атаки турелей
+        float deltaTime = GetFrameTime();
+        spawnTimer += deltaTime;
 
-            // Пересчитываем путь после установки турелей
-            previousPath = path; // Сохраняем предыдущий путь для проверки изменений
-            path.clear(); // Очищаем старый путь
-            bool foundPath = aStar(startX, startY, endX, endY, matrix1, reservedCells, path); // Запуск A* с учетом зарезервированных клеток
+        if (enemies.empty() && spawnTimer >= spawnDelay) {
+            reservedCells.assign(rows, std::vector<bool>(cols, false));
+            markAttackRadius(turrets, reservedCells);
+
+            previousPath = path;
+            path.clear();
+            bool foundPath = aStar(startX, startY, endX, endY, matrix1, reservedCells, path);
 
             if (foundPath) {
-                if (path != previousPath) { // Проверка, изменился ли маршрут
-                    std::cout << "Новый маршрут найден!" << std::endl;
-                }
-                else {
-                    std::cout << "Маршрут не изменился." << std::endl;
-                }
-                wave(enemies, waveNumber, path); // Запускаем новую волну с новым путем
-                waveNumber++; // Увеличиваем номер волны
+                wave(enemies, waveNumber, path, enemySpawnDelay);
+                std::cout << "Wave " << waveNumber + 1 << ": " << enemies.size() << " enemies spawned." << std::endl;
+                waveNumber++;
+                spawnTimer = 0.0f;
             }
             else {
-                std::cout << "Нет пути." << std::endl;
-                break; // Выход из цикла, если путь не найден
+                std::cout << "No path found. Game Over." << std::endl;
+                break;
             }
         }
 
-        float deltaTime = GetFrameTime(); // Время, прошедшее с последнего кадра
-
         for (auto& turret : turrets) {
-            turret.attack(enemies, deltaTime); // Турели атакуют врагов
+            turret.attack(enemies, deltaTime);
         }
 
         for (size_t i = 0; i < enemies.size(); ) {
             if (enemies[i].alive) {
-                enemies[i].update(deltaTime); // Обновить позицию живого врага
-                i++; // Увеличить индекс только для живых врагов
+                enemies[i].update(deltaTime, enemies);
+                i++;
             }
             else {
-                enemies.erase(enemies.begin() + i); // Удалить мертвого врага
+                enemies.erase(enemies.begin() + i);
             }
         }
 
-        // Обработка ввода для установки или удаления турелей
         if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) {
             Vector2 mousePos = GetMousePosition();
             int gridX = static_cast<int>(mousePos.x / (cellSize + otstup));
             int gridY = static_cast<int>(mousePos.y / (cellSize + otstup));
 
-            // Проверка на количество турелей и что клик был в границах и на клетке 1
             if (isValid(gridX, gridY)) {
                 bool turretFound = false;
-
-                // Проверка на существование турели по координатам
                 for (size_t i = 0; i < turrets.size(); ++i) {
                     if (turrets[i].x == gridX && turrets[i].y == gridY) {
-                        turrets.erase(turrets.begin() + i); // Удаляем турель
+                        turrets.erase(turrets.begin() + i);
                         turretFound = true;
                         break;
                     }
                 }
-
-                // Если турели не найдено, добавляем новую
                 if (!turretFound && turrets.size() < maxTurrets && matrix1[gridY][gridX] == 1) {
                     turrets.emplace_back(gridX, gridY);
                 }
@@ -366,39 +351,33 @@ int main() {
         ClearBackground(DARKGRAY);
         DrawMatrix(matrix1);
 
-        // Рисуем найденный путь
-        float offset = cellSize / 4; // смещение для центрирования
-        for (const auto& node : path) {
+        float offset = cellSize / 4;
+        for (const Node& node : path) {
             DrawRectangle(static_cast<int>(node.x * (cellSize + otstup) + offset),
                 static_cast<int>(node.y * (cellSize + otstup) + offset),
                 static_cast<int>(cellSize / 2),
-                static_cast<int>(cellSize / 2),
-                GRAY);
+                static_cast<int>(cellSize / 2), GRAY);
         }
 
-        // Рисуем турели
         for (const auto& turret : turrets) {
             turret.draw();
         }
 
-        // Рисуем врагов
         for (const auto& enemy : enemies) {
-            if (enemy.alive) { // Проверяем, жив ли враг
-                float offset1 = cellSize / 2;
-                DrawCircle(static_cast<int>(enemy.x * (cellSize + otstup) + offset1),
-                    static_cast<int>(enemy.y * (cellSize + otstup) + offset1),
-                    static_cast<int>(cellSize / 4),
-                    MAGENTA);
+            if (enemy.alive) {
+                float offset = cellSize / 2;
+                DrawCircle(static_cast<int>(enemy.x * (cellSize + otstup) + offset),
+                    static_cast<int>(enemy.y * (cellSize + otstup) + offset),
+                    static_cast<int>(cellSize / 4), MAGENTA);
             }
         }
 
-        // Отображаем счётчик турелей
         DrawText(("Turrets: " + std::to_string(turrets.size())).c_str(), 600, 10, 20, WHITE);
-        // Отображаем номер текущей волны
         DrawText(("Wave: " + std::to_string(waveNumber)).c_str(), 600, 40, 20, WHITE);
 
         EndDrawing();
     }
+
     CloseWindow();
     return 0;
 }
