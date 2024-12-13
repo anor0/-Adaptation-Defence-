@@ -7,6 +7,33 @@
 #include <limits> // for numeric_limits
 #include "raylib.h"
 
+// Helper function to clamp a value between min and max
+int clamp(int value, int min, int max) {
+    return std::max(min, std::min(value, max));
+}
+
+// Функция для интерполяции цвета в зависимости от здоровья врага
+Color interpolateColor(int health, int maxHealth) {
+    float t = (float)health / maxHealth;
+    if (t <= 0.5f) {
+        // Manual linear interpolation with clamping
+        unsigned char r = (unsigned char)clamp((int)(RED.r + (YELLOW.r - RED.r) * t * 2.0f), 0, 255);
+        unsigned char g = (unsigned char)clamp((int)(RED.g + (YELLOW.g - RED.g) * t * 2.0f), 0, 255);
+        unsigned char b = (unsigned char)clamp((int)(RED.b + (YELLOW.b - RED.b) * t * 2.0f), 0, 255);
+        unsigned char a = (unsigned char)clamp((int)(RED.a + (YELLOW.a - RED.a) * t * 2.0f), 0, 255);
+        return Color{ r, g, b, a };
+    }
+    else {
+        // Manual linear interpolation with clamping
+        unsigned char r = (unsigned char)clamp((int)(YELLOW.r + (GREEN.r - YELLOW.r) * (t - 0.5f) * 2.0f), 0, 255);
+        unsigned char g = (unsigned char)clamp((int)(YELLOW.g + (GREEN.g - YELLOW.g) * (t - 0.5f) * 2.0f), 0, 255);
+        unsigned char b = (unsigned char)clamp((int)(YELLOW.b + (GREEN.b - YELLOW.b) * (t - 0.5f) * 2.0f), 0, 255);
+        unsigned char a = (unsigned char)clamp((int)(YELLOW.a + (GREEN.a - YELLOW.a) * (t - 0.5f) * 2.0f), 0, 255);
+        return Color{ r, g, b, a };
+    }
+}
+
+
 // Определение констант
 const int rows = 13;
 const int cols = 13;
@@ -143,6 +170,7 @@ public:
     int x, y;
     int speed = 1;
     int health;
+    int maxHealth; // Store maximum health
     bool alive = true;
     int id;
     bool canMove = false;
@@ -154,7 +182,7 @@ public:
     float elapsedTime = 0.0f;
 
     Enemy(int startX, int startY, const std::vector<Node>& foundPath, int enemyID, int enemyHealth)
-        : x(startX), y(startY), path(foundPath), id(enemyID), health(enemyHealth) {}
+        : x(startX), y(startY), path(foundPath), id(enemyID), health(enemyHealth), maxHealth(enemyHealth) {}
 
     void update(float deltaTime, const std::vector<Enemy>& enemies) {
         if (!alive) return;
@@ -282,7 +310,6 @@ int main() {
     std::vector<Node> path;
     std::vector<Node> previousPath;
     std::vector<std::vector<bool>> reservedCells(rows, std::vector<bool>(cols, false));
-
     std::vector<Enemy> enemies;
     int waveNumber = 0;
     const int maxTurrets = 4;
@@ -369,9 +396,10 @@ int main() {
         for (const auto& enemy : enemies) {
             if (enemy.alive) {
                 float offset = cellSize / 2;
+                Color enemyColor = interpolateColor(enemy.health, enemy.maxHealth);
                 DrawCircle(static_cast<int>(enemy.x * (cellSize + otstup) + offset),
                     static_cast<int>(enemy.y * (cellSize + otstup) + offset),
-                    static_cast<int>(cellSize / 4), MAGENTA);
+                    static_cast<int>(cellSize / 4), enemyColor);
             }
         }
 
