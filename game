@@ -4,7 +4,7 @@
 #include <algorithm>
 #include <cmath>
 #include <string>
-#include <limits> // for numeric_limits
+#include <limits>
 #include "raylib.h"
 
 // Helper function to clamp a value between min and max
@@ -16,7 +16,6 @@ int clamp(int value, int min, int max) {
 Color interpolateColor(int health, int maxHealth) {
     float t = (float)health / maxHealth;
     if (t <= 0.5f) {
-        // Manual linear interpolation with clamping
         unsigned char r = (unsigned char)clamp((int)(RED.r + (YELLOW.r - RED.r) * t * 2.0f), 0, 255);
         unsigned char g = (unsigned char)clamp((int)(RED.g + (YELLOW.g - RED.g) * t * 2.0f), 0, 255);
         unsigned char b = (unsigned char)clamp((int)(RED.b + (YELLOW.b - RED.b) * t * 2.0f), 0, 255);
@@ -24,7 +23,6 @@ Color interpolateColor(int health, int maxHealth) {
         return Color{ r, g, b, a };
     }
     else {
-        // Manual linear interpolation with clamping
         unsigned char r = (unsigned char)clamp((int)(YELLOW.r + (GREEN.r - YELLOW.r) * (t - 0.5f) * 2.0f), 0, 255);
         unsigned char g = (unsigned char)clamp((int)(YELLOW.g + (GREEN.g - YELLOW.g) * (t - 0.5f) * 2.0f), 0, 255);
         unsigned char b = (unsigned char)clamp((int)(YELLOW.b + (GREEN.b - YELLOW.b) * (t - 0.5f) * 2.0f), 0, 255);
@@ -32,7 +30,6 @@ Color interpolateColor(int health, int maxHealth) {
         return Color{ r, g, b, a };
     }
 }
-
 
 // Определение констант
 const int rows = 13;
@@ -287,7 +284,6 @@ void wave(std::vector<Enemy>& enemies, int waveNumber, const std::vector<Node>& 
     }
 }
 
-
 int main() {
     InitWindow(800, 600, "Game");
     SetTargetFPS(60);
@@ -319,92 +315,133 @@ int main() {
 
     std::vector<Turret> turrets;
 
+    // Переменная для отслеживания игры
+    bool gameOver = false;
+
     while (!WindowShouldClose()) {
         float deltaTime = GetFrameTime();
         spawnTimer += deltaTime;
 
-        if (enemies.empty() && spawnTimer >= spawnDelay) {
-            reservedCells.assign(rows, std::vector<bool>(cols, false));
-            markAttackRadius(turrets, reservedCells);
-
-            previousPath = path;
-            path.clear();
-            bool foundPath = aStar(startX, startY, endX, endY, matrix1, reservedCells, path);
-
-            if (foundPath) {
-                wave(enemies, waveNumber, path, enemySpawnDelay);
-                std::cout << "Wave " << waveNumber + 1 << ": " << enemies.size() << " enemies spawned." << std::endl;
-                waveNumber++;
-                spawnTimer = 0.0f;
-            }
-            else {
-                std::cout << "No path found. Game Over." << std::endl;
+        // Проверка на GAME OVER
+        bool gameLost = false;
+        for (const auto& enemy : enemies) {
+            if (enemy.alive && enemy.x == endX && enemy.y == endY) {
+                gameLost = true;
                 break;
             }
         }
 
-        for (auto& turret : turrets) {
-            turret.attack(enemies, deltaTime);
+        if (gameLost) {
+            gameOver = true; // Меняем флаг gameOver на true
         }
 
-        for (size_t i = 0; i < enemies.size(); ) {
-            if (enemies[i].alive) {
-                enemies[i].update(deltaTime, enemies);
-                i++;
-            }
-            else {
-                enemies.erase(enemies.begin() + i);
-            }
-        }
+        // Логика игры продолжается только, если игра не закончена
+        if (!gameOver) {
+            // Если не закончена игра, выполняем логику
+            if (enemies.empty() && spawnTimer >= spawnDelay) {
+                reservedCells.assign(rows, std::vector<bool>(cols, false));
+                markAttackRadius(turrets, reservedCells);
 
-        if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) {
-            Vector2 mousePos = GetMousePosition();
-            int gridX = static_cast<int>(mousePos.x / (cellSize + otstup));
-            int gridY = static_cast<int>(mousePos.y / (cellSize + otstup));
+                previousPath = path;
+                path.clear();
+                bool foundPath = aStar(startX, startY, endX, endY, matrix1, reservedCells, path);
 
-            if (isValid(gridX, gridY)) {
-                bool turretFound = false;
-                for (size_t i = 0; i < turrets.size(); ++i) {
-                    if (turrets[i].x == gridX && turrets[i].y == gridY) {
-                        turrets.erase(turrets.begin() + i);
-                        turretFound = true;
-                        break;
+                if (foundPath) {
+                    wave(enemies, waveNumber, path, enemySpawnDelay);
+                    std::cout << "Wave " << waveNumber + 1 << ": " << enemies.size() << " enemies spawned." << std::endl;
+                    waveNumber++;
+                    spawnTimer = 0.0f;
+                }
+                else {
+                    std::cout << "No path found. Game Over." << std::endl;
+                    break;
+                }
+            }
+
+            for (auto& turret : turrets) {
+                turret.attack(enemies, deltaTime);
+            }
+
+            for (size_t i = 0; i < enemies.size(); ) {
+                if (enemies[i].alive) {
+                    enemies[i].update(deltaTime, enemies);
+                    i++;
+                }
+                else {
+                    enemies.erase(enemies.begin() + i);
+                }
+            }
+
+            if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) {
+                Vector2 mousePos = GetMousePosition();
+                int gridX = static_cast<int>(mousePos.x / (cellSize + otstup));
+                int gridY = static_cast<int>(mousePos.y / (cellSize + otstup));
+
+                if (isValid(gridX, gridY)) {
+                    bool turretFound = false;
+
+                    for (size_t i = 0; i < turrets.size(); ++i) {
+                        if (turrets[i].x == gridX && turrets[i].y == gridY) {
+                            turrets.erase(turrets.begin() + i);
+                            turretFound = true;
+                            break;
+                        }
+                    }
+
+                    if (!turretFound && turrets.size() < maxTurrets && matrix1[gridY][gridX] == 1) {
+                        turrets.emplace_back(gridX, gridY);
                     }
                 }
-                if (!turretFound && turrets.size() < maxTurrets && matrix1[gridY][gridX] == 1) {
-                    turrets.emplace_back(gridX, gridY);
-                }
             }
         }
 
+        // Отрисовка всего, включая сообщение "YOU LOOSE", если игра окончена
         BeginDrawing();
         ClearBackground(DARKGRAY);
-        DrawMatrix(matrix1);
 
-        float offset = cellSize / 4;
-        for (const Node& node : path) {
-            DrawRectangle(static_cast<int>(node.x * (cellSize + otstup) + offset),
-                static_cast<int>(node.y * (cellSize + otstup) + offset),
-                static_cast<int>(cellSize / 2),
-                static_cast<int>(cellSize / 2), GRAY);
-        }
+        // Отрисовка матрицы только если игра продолжается
+        if (!gameOver) {
+            DrawMatrix(matrix1);
 
-        for (const auto& turret : turrets) {
-            turret.draw();
-        }
-
-        for (const auto& enemy : enemies) {
-            if (enemy.alive) {
-                float offset = cellSize / 2;
-                Color enemyColor = interpolateColor(enemy.health, enemy.maxHealth);
-                DrawCircle(static_cast<int>(enemy.x * (cellSize + otstup) + offset),
-                    static_cast<int>(enemy.y * (cellSize + otstup) + offset),
-                    static_cast<int>(cellSize / 4), enemyColor);
+            float offset = cellSize / 4;
+            for (const Node& node : path) {
+                DrawRectangle(static_cast<int>(node.x * (cellSize + otstup) + offset),
+                    static_cast<int>(node.y * (cellSize + otstup) + offset),
+                    static_cast<int>(cellSize / 2),
+                    static_cast<int>(cellSize / 2), GRAY);
             }
+
+            for (const auto& turret : turrets) {
+                turret.draw();
+            }
+
+            for (const auto& enemy : enemies) {
+                if (enemy.alive) {
+                    float enemyOffset = cellSize / 2;
+                    Color enemyColor = interpolateColor(enemy.health, enemy.maxHealth);
+                    DrawCircle(static_cast<int>(enemy.x * (cellSize + otstup) + enemyOffset),
+                        static_cast<int>(enemy.y * (cellSize + otstup) + enemyOffset),
+                        static_cast<int>(cellSize / 4), enemyColor);
+                }
+            }
+
+            DrawText(("Turrets: " + std::to_string(turrets.size())).c_str(), 600, 10, 20, WHITE);
+            DrawText(("Wave: " + std::to_string(waveNumber)).c_str(), 600, 40, 20, WHITE);
         }
 
-        DrawText(("Turrets: " + std::to_string(turrets.size())).c_str(), 600, 10, 20, WHITE);
-        DrawText(("Wave: " + std::to_string(waveNumber)).c_str(), 600, 40, 20, WHITE);
+        // Отображение сообщения "YOU LOOSE" в центре экрана
+        if (gameOver) {
+            const char* message = "YOU LOOSE";
+            int fontSize = 80; // Размер шрифта
+            int textWidth = MeasureText(message, fontSize); // Измеряем ширину текста
+            int textHeight = fontSize; // Высота текста
+
+            // Центрируем текст по ширине и высоте окна
+            int x = (GetScreenWidth() - textWidth) / 2;
+            int y = (GetScreenHeight() - textHeight) / 2;
+
+            DrawText(message, x, y, fontSize, RED);
+        }
 
         EndDrawing();
     }
