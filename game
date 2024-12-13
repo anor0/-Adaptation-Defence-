@@ -7,7 +7,7 @@
 #include <limits>
 #include "raylib.h"
 
-// Helper function to clamp a value between min and max
+
 int clamp(int value, int min, int max) {
     return std::max(min, std::min(value, max));
 }
@@ -166,7 +166,7 @@ public:
     int x, y;
     int speed = 1;
     int health;
-    int maxHealth; // Store maximum health
+    int maxHealth; 
     bool alive = true;
     int id;
     bool canMove = false;
@@ -250,7 +250,7 @@ void wave(std::vector<Enemy>& enemies, int waveNumber, const std::vector<Node>& 
         if (i < enemiesInWave - 1) {
             double startTime = GetTime();
             while (GetTime() - startTime < enemySpawnDelay && !WindowShouldClose()) {
-                // Keep the game responsive during the wait
+                
             }
         }
     }
@@ -287,8 +287,8 @@ int main() {
 
     std::vector<Turret> turrets;
 
-    int baseHealth = 3; // Add base health
-    bool gameOver = false; // Add game over flag
+    int baseHealth = 3; 
+    bool gameOver = false; 
     bool gameLost = false;
 
     while (!WindowShouldClose()) {
@@ -416,19 +416,18 @@ int main() {
 
 
             int xLose = (GetScreenWidth() - loseTextWidth) / 2;
-            int yLose = (GetScreenHeight() - loseTextHeight) / 2 - loseTextHeight / 2; // Adjusted y position
+            int yLose = (GetScreenHeight() - loseTextHeight) / 2 - loseTextHeight / 2; 
             DrawText(loseMessage, xLose, yLose, fontSizeLose, RED);
 
 
             int xRestart = (GetScreenWidth() - restartTextWidth) / 2;
-            int yRestart = yLose + loseTextHeight; // Restart button below YOU LOOSE
-            DrawRectangle(xRestart - 10, yRestart - 5, restartTextWidth + 20, restartTextHeight + 10, GREEN); //Added rectangle
+            int yRestart = yLose + loseTextHeight; 
+            DrawRectangle(xRestart - 10, yRestart - 5, restartTextWidth + 20, restartTextHeight + 10, GREEN); 
             DrawText(restartMessage, xRestart, yRestart, fontSizeRestart, BLACK);
 
 
-            Rectangle restartButton = { xRestart - 10, yRestart - 5, restartTextWidth + 20, restartTextHeight + 10 }; // Define button rect
+            Rectangle restartButton = { xRestart - 10, yRestart - 5, restartTextWidth + 20, restartTextHeight + 10 }; 
             if (CheckCollisionPointRec(GetMousePosition(), restartButton) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-                // Reset game state
                 gameOver = false;
                 gameLost = false;
                 enemies.clear();
@@ -474,3 +473,4 @@ void Enemy::update(float deltaTime, const std::vector<Enemy>& enemies) {
         elapsedTime += deltaTime;
     }
 }
+
