@@ -39,7 +39,7 @@ const int otstup = 5;
 
 // 0 - проходимая клетка
 // 1 - стена
-// 2 - спавнер
+// 2 - место появления врагов (спавнер)
 // 3 - база
 
 const int matrix1[rows][cols] =
@@ -166,7 +166,7 @@ public:
     int x, y;
     int speed = 1;
     int health;
-    int maxHealth; 
+    int maxHealth;
     bool alive = true;
     int id;
     bool canMove = false;
@@ -250,7 +250,7 @@ void wave(std::vector<Enemy>& enemies, int waveNumber, const std::vector<Node>& 
         if (i < enemiesInWave - 1) {
             double startTime = GetTime();
             while (GetTime() - startTime < enemySpawnDelay && !WindowShouldClose()) {
-                
+
             }
         }
     }
@@ -287,8 +287,8 @@ int main() {
 
     std::vector<Turret> turrets;
 
-    int baseHealth = 3; 
-    bool gameOver = false; 
+    int baseHealth = 3;
+    bool gameOver = false;
     bool gameLost = false;
 
     while (!WindowShouldClose()) {
@@ -404,7 +404,7 @@ int main() {
         }
         // Отображение сообщения "YOU LOOSE" и кнопки "Restart"
         if (gameOver) {
-            const char* loseMessage = "YOU LOOSE";
+            const char* loseMessage = "YOU LOSE";
             const char* restartMessage = "Restart";
             int fontSizeLose = 80;
             int fontSizeRestart = 30;
@@ -416,17 +416,17 @@ int main() {
 
 
             int xLose = (GetScreenWidth() - loseTextWidth) / 2;
-            int yLose = (GetScreenHeight() - loseTextHeight) / 2 - loseTextHeight / 2; 
+            int yLose = (GetScreenHeight() - loseTextHeight) / 2 - loseTextHeight / 2;
             DrawText(loseMessage, xLose, yLose, fontSizeLose, RED);
 
 
             int xRestart = (GetScreenWidth() - restartTextWidth) / 2;
-            int yRestart = yLose + loseTextHeight; 
-            DrawRectangle(xRestart - 10, yRestart - 5, restartTextWidth + 20, restartTextHeight + 10, GREEN); 
+            int yRestart = yLose + loseTextHeight;
+            DrawRectangle(xRestart - 10, yRestart - 5, restartTextWidth + 20, restartTextHeight + 10, GREEN);
             DrawText(restartMessage, xRestart, yRestart, fontSizeRestart, BLACK);
 
 
-            Rectangle restartButton = { xRestart - 10, yRestart - 5, restartTextWidth + 20, restartTextHeight + 10 }; 
+            Rectangle restartButton = { xRestart - 10, yRestart - 5, restartTextWidth + 20, restartTextHeight + 10 };
             if (CheckCollisionPointRec(GetMousePosition(), restartButton) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
                 gameOver = false;
                 gameLost = false;
@@ -473,4 +473,3 @@ void Enemy::update(float deltaTime, const std::vector<Enemy>& enemies) {
         elapsedTime += deltaTime;
     }
 }
-
