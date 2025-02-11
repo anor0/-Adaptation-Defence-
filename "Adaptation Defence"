@@ -7,7 +7,6 @@
 #include <limits>
 #include "raylib.h"
 
-
 int clamp(int value, int min, int max) {
     return std::max(min, std::min(value, max));
 }
@@ -53,7 +52,7 @@ const int matrix1[rows][cols] =
     {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
     {1, 0, 0, 1, 0, 0, 1, 1, 0, 1, 1, 0, 1},
     {1, 0, 0, 1, 0, 0, 1, 1, 0, 1, 1, 0, 1},
-    {1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
     {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1},
     {1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1},
     {1, 1, 1, 1, 1, 0, 3, 0, 1, 1, 1, 1, 1}
@@ -286,16 +285,19 @@ int main() {
     float enemySpawnDelay = 0.2f;
 
     std::vector<Turret> turrets;
+    // Ограничение на перестановки турелей
+    int turretAdjustmentsAvailable = 4; // Начальное количество перестановок
 
     int baseHealth = 3;
     bool gameOver = false;
     bool gameLost = false;
 
+    // Определяем прямоугольник кнопки Restart
+    Rectangle restartButton = { 620, 500, 150, 40 };
+
     while (!WindowShouldClose()) {
         float deltaTime = GetFrameTime();
         spawnTimer += deltaTime;
-
-
 
         // Проверка на GAME OVER
         for (const auto& enemy : enemies) {
@@ -325,6 +327,7 @@ int main() {
                     std::cout << "Wave " << waveNumber + 1 << ": " << enemies.size() << " enemies spawned." << std::endl;
                     waveNumber++;
                     spawnTimer = 0.0f;
+                    turretAdjustmentsAvailable += 4; // Добавляем 4 перестановки в начале каждой волны
                 }
                 else {
                     std::cout << "No path found. Game Over." << std::endl;
@@ -345,8 +348,8 @@ int main() {
                     enemies.erase(enemies.begin() + i);
                 }
             }
-
-            if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) {
+            // Размещение турелей:
+            if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON) && turretAdjustmentsAvailable > 0) {
                 Vector2 mousePos = GetMousePosition();
                 int gridX = static_cast<int>(mousePos.x / (cellSize + otstup));
                 int gridY = static_cast<int>(mousePos.y / (cellSize + otstup));
@@ -358,15 +361,18 @@ int main() {
                         if (turrets[i].x == gridX && turrets[i].y == gridY) {
                             turrets.erase(turrets.begin() + i);
                             turretFound = true;
+                            turretAdjustmentsAvailable--; // Учитываем удаление как перестановку
                             break;
                         }
                     }
 
                     if (!turretFound && turrets.size() < maxTurrets && matrix1[gridY][gridX] == 1) {
                         turrets.emplace_back(gridX, gridY);
+                        turretAdjustmentsAvailable--; // Учитываем установку как перестановку
                     }
                 }
             }
+
         }
 
         // Отрисовка всего, включая сообщение "YOU LOOSE", если игра окончена
@@ -401,6 +407,7 @@ int main() {
 
             DrawText(("Turrets: " + std::to_string(turrets.size())).c_str(), 600, 10, 20, WHITE);
             DrawText(("Wave: " + std::to_string(waveNumber)).c_str(), 600, 40, 20, WHITE);
+            DrawText(("Adjustments left: " + std::to_string(turretAdjustmentsAvailable)).c_str(), 600, 70, 20, WHITE);
         }
         // Отображение сообщения "YOU LOOSE" и кнопки "Restart"
         if (gameOver) {
@@ -414,20 +421,19 @@ int main() {
             int restartTextWidth = MeasureText(restartMessage, fontSizeRestart);
             int restartTextHeight = fontSizeRestart;
 
-
             int xLose = (GetScreenWidth() - loseTextWidth) / 2;
             int yLose = (GetScreenHeight() - loseTextHeight) / 2 - loseTextHeight / 2;
             DrawText(loseMessage, xLose, yLose, fontSizeLose, RED);
 
-
-            int xRestart = (GetScreenWidth() - restartTextWidth) / 2;
-            int yRestart = yLose + loseTextHeight;
-            DrawRectangle(xRestart - 10, yRestart - 5, restartTextWidth + 20, restartTextHeight + 10, GREEN);
+            // Рисуем кнопку Restart
+            DrawRectangleRec(restartButton, GREEN);
+            int xRestart = restartButton.x + (restartButton.width - restartTextWidth) / 2;
+            int yRestart = restartButton.y + (restartButton.height - fontSizeRestart) / 2;
             DrawText(restartMessage, xRestart, yRestart, fontSizeRestart, BLACK);
 
-
-            Rectangle restartButton = { xRestart - 10, yRestart - 5, restartTextWidth + 20, restartTextHeight + 10 };
-            if (CheckCollisionPointRec(GetMousePosition(), restartButton) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            // Проверяем нажатие на кнопку Restart
+            if (CheckCollisionPointRec(GetMousePosition(), restartButton) && IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
+            {
                 gameOver = false;
                 gameLost = false;
                 enemies.clear();
@@ -435,7 +441,9 @@ int main() {
                 spawnTimer = 0.0f;
                 baseHealth = 3;
                 turrets.clear();
+                turretAdjustmentsAvailable = 4;
             }
+
         }
 
         EndDrawing();
