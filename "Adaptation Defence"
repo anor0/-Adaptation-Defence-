@@ -259,194 +259,229 @@ int main() {
     InitWindow(800, 600, "Game");
     SetTargetFPS(60);
 
-    int startX = -1, startY = -1, endX = -1, endY = -1;
+    // Переменные для меню
+    bool gameStarted = false;
+    Rectangle startButton = { 300, 400, 200, 50 };
 
-    for (int i = 0; i < rows; i++) {
-        for (int j = 0; j < cols; j++) {
-            if (matrix1[i][j] == 2) { startX = j; startY = i; }
-            if (matrix1[i][j] == 3) { endX = j; endY = i; }
-        }
-    }
-
-    if (startX == -1 || startY == -1 || endX == -1 || endY == -1) {
-        std::cerr << "Error: Start or end point not found!" << std::endl;
-        CloseWindow();
-        return -1;
-    }
-
-    std::vector<Node> path;
-    std::vector<Node> previousPath;
-    std::vector<std::vector<bool>> reservedCells(rows, std::vector<bool>(cols, false));
-    std::vector<Enemy> enemies;
-    int waveNumber = 0;
-    const int maxTurrets = 4;
-    float spawnDelay = 1.0f;
-    float spawnTimer = 0.0f;
-    float enemySpawnDelay = 0.2f;
-
-    std::vector<Turret> turrets;
-    // Ограничение на перестановки турелей
-    int turretAdjustmentsAvailable = 4; // Начальное количество перестановок
-
-    int baseHealth = 3;
-    bool gameOver = false;
-    bool gameLost = false;
-
-    // Определяем прямоугольник кнопки Restart
-    Rectangle restartButton = { 620, 500, 150, 40 };
-
+    // Главный игровой цикл
     while (!WindowShouldClose()) {
-        float deltaTime = GetFrameTime();
-        spawnTimer += deltaTime;
-
-        // Проверка на GAME OVER
-        for (const auto& enemy : enemies) {
-            if (enemy.alive && enemy.x == endX && enemy.y == endY) {
-                gameLost = true;
-                break;
+        // Обработка ввода для меню
+        if (!gameStarted) {
+            if (CheckCollisionPointRec(GetMousePosition(), startButton) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                gameStarted = true;
             }
         }
 
-        if (gameLost) {
-            gameOver = true; // Меняем флаг gameOver на true
-        }
+        // Если игра началась, выполняем основной игровой код
+        if (gameStarted) {
+            int startX = -1, startY = -1, endX = -1, endY = -1;
 
-        // Логика игры продолжается только, если игра не закончена
-        if (!gameOver) {
-            // Если не закончена игра, выполняем логику
-            if (enemies.empty() && spawnTimer >= spawnDelay) {
-                reservedCells.assign(rows, std::vector<bool>(cols, false));
-                markAttackRadius(turrets, reservedCells);
-
-                previousPath = path;
-                path.clear();
-                bool foundPath = aStar(startX, startY, endX, endY, matrix1, reservedCells, path);
-
-                if (foundPath) {
-                    wave(enemies, waveNumber, path, enemySpawnDelay);
-                    std::cout << "Wave " << waveNumber + 1 << ": " << enemies.size() << " enemies spawned." << std::endl;
-                    waveNumber++;
-                    spawnTimer = 0.0f;
-                    turretAdjustmentsAvailable += 4; // Добавляем 4 перестановки в начале каждой волны
-                }
-                else {
-                    std::cout << "No path found. Game Over." << std::endl;
-                    break;
+            for (int i = 0; i < rows; i++) {
+                for (int j = 0; j < cols; j++) {
+                    if (matrix1[i][j] == 2) { startX = j; startY = i; }
+                    if (matrix1[i][j] == 3) { endX = j; endY = i; }
                 }
             }
 
-            for (auto& turret : turrets) {
-                turret.attack(enemies, deltaTime);
+            if (startX == -1 || startY == -1 || endX == -1 || endY == -1) {
+                std::cerr << "Error: Start or end point not found!" << std::endl;
+                CloseWindow();
+                return -1;
             }
 
-            for (size_t i = 0; i < enemies.size(); ) {
-                if (enemies[i].alive) {
-                    enemies[i].update(deltaTime, enemies);
-                    i++;
-                }
-                else {
-                    enemies.erase(enemies.begin() + i);
-                }
-            }
-            // Размещение турелей:
-            if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON) && turretAdjustmentsAvailable > 0) {
-                Vector2 mousePos = GetMousePosition();
-                int gridX = static_cast<int>(mousePos.x / (cellSize + otstup));
-                int gridY = static_cast<int>(mousePos.y / (cellSize + otstup));
+            std::vector<Node> path;
+            std::vector<Node> previousPath;
+            std::vector<std::vector<bool>> reservedCells(rows, std::vector<bool>(cols, false));
+            std::vector<Enemy> enemies;
+            int waveNumber = 0;
+            const int maxTurrets = 4;
+            float spawnDelay = 1.0f;
+            float spawnTimer = 0.0f;
+            float enemySpawnDelay = 0.2f;
 
-                if (isValid(gridX, gridY)) {
-                    bool turretFound = false;
+            std::vector<Turret> turrets;
+            // Ограничение на перестановки турелей
+            int turretAdjustmentsAvailable = 4; // Начальное количество перестановок
 
-                    for (size_t i = 0; i < turrets.size(); ++i) {
-                        if (turrets[i].x == gridX && turrets[i].y == gridY) {
-                            turrets.erase(turrets.begin() + i);
-                            turretFound = true;
-                            turretAdjustmentsAvailable--; // Учитываем удаление как перестановку
+            int baseHealth = 3;
+            bool gameOver = false;
+            bool gameLost = false;
+
+            // Определяем прямоугольник кнопки Restart
+            Rectangle restartButton = { 620, 500, 150, 40 };
+
+            while (!WindowShouldClose() && gameStarted) {
+                float deltaTime = GetFrameTime();
+                spawnTimer += deltaTime;
+
+                // Проверка на GAME OVER
+                for (const auto& enemy : enemies) {
+                    if (enemy.alive && enemy.x == endX && enemy.y == endY) {
+                        gameLost = true;
+                        break;
+                    }
+                }
+
+                if (gameLost) {
+                    gameOver = true; // Меняем флаг gameOver на true
+                }
+
+                // Логика игры продолжается только, если игра не закончена
+                if (!gameOver) {
+                    // Если не закончена игра, выполняем логику
+                    if (enemies.empty() && spawnTimer >= spawnDelay) {
+                        reservedCells.assign(rows, std::vector<bool>(cols, false));
+                        markAttackRadius(turrets, reservedCells);
+
+                        previousPath = path;
+                        path.clear();
+                        bool foundPath = aStar(startX, startY, endX, endY, matrix1, reservedCells, path);
+
+                        if (foundPath) {
+                            wave(enemies, waveNumber, path, enemySpawnDelay);
+                            std::cout << "Wave " << waveNumber + 1 << ": " << enemies.size() << " enemies spawned." << std::endl;
+                            waveNumber++;
+                            spawnTimer = 0.0f;
+                            turretAdjustmentsAvailable += 4; // Добавляем 4 перестановки в начале каждой волны
+                        }
+                        else {
+                            std::cout << "No path found. Game Over." << std::endl;
                             break;
                         }
                     }
 
-                    if (!turretFound && turrets.size() < maxTurrets && matrix1[gridY][gridX] == 1) {
-                        turrets.emplace_back(gridX, gridY);
-                        turretAdjustmentsAvailable--; // Учитываем установку как перестановку
+                    for (auto& turret : turrets) {
+                        turret.attack(enemies, deltaTime);
+                    }
+
+                    for (size_t i = 0; i < enemies.size(); ) {
+                        if (enemies[i].alive) {
+                            enemies[i].update(deltaTime, enemies);
+                            i++;
+                        }
+                        else {
+                            enemies.erase(enemies.begin() + i);
+                        }
+                    }
+                    // Размещение турелей:
+                    if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON) && turretAdjustmentsAvailable > 0) {
+                        Vector2 mousePos = GetMousePosition();
+                        int gridX = static_cast<int>(mousePos.x / (cellSize + otstup));
+                        int gridY = static_cast<int>(mousePos.y / (cellSize + otstup));
+
+                        if (isValid(gridX, gridY)) {
+                            bool turretFound = false;
+
+                            for (size_t i = 0; i < turrets.size(); ++i) {
+                                if (turrets[i].x == gridX && turrets[i].y == gridY) {
+                                    turrets.erase(turrets.begin() + i);
+                                    turretFound = true;
+                                    turretAdjustmentsAvailable--; // Учитываем удаление как перестановку
+                                    break;
+                                }
+                            }
+
+                            if (!turretFound && turrets.size() < maxTurrets && matrix1[gridY][gridX] == 1) {
+                                turrets.emplace_back(gridX, gridY);
+                                turretAdjustmentsAvailable--; // Учитываем установку как перестановку
+                            }
+                        }
                     }
                 }
-            }
 
-        }
+                // Отрисовка всего, включая сообщение "YOU LOOSE", если игра окончена
+                BeginDrawing();
+                ClearBackground(DARKGRAY);
 
-        // Отрисовка всего, включая сообщение "YOU LOOSE", если игра окончена
-        BeginDrawing();
-        ClearBackground(DARKGRAY);
+                // Отрисовка матрицы только если игра продолжается
+                if (!gameOver) {
+                    DrawMatrix(matrix1);
 
-        // Отрисовка матрицы только если игра продолжается
-        if (!gameOver) {
-            DrawMatrix(matrix1);
+                    float offset = cellSize / 4;
+                    for (const Node& node : path) {
+                        DrawRectangle(static_cast<int>(node.x * (cellSize + otstup) + offset),
+                            static_cast<int>(node.y * (cellSize + otstup) + offset),
+                            static_cast<int>(cellSize / 2),
+                            static_cast<int>(cellSize / 2), GRAY);
+                    }
 
-            float offset = cellSize / 4;
-            for (const Node& node : path) {
-                DrawRectangle(static_cast<int>(node.x * (cellSize + otstup) + offset),
-                    static_cast<int>(node.y * (cellSize + otstup) + offset),
-                    static_cast<int>(cellSize / 2),
-                    static_cast<int>(cellSize / 2), GRAY);
-            }
+                    for (const auto& turret : turrets) {
+                        turret.draw();
+                    }
 
-            for (const auto& turret : turrets) {
-                turret.draw();
-            }
+                    for (const auto& enemy : enemies) {
+                        if (enemy.alive) {
+                            float enemyOffset = cellSize / 2;
+                            Color enemyColor = interpolateColor(enemy.health, enemy.maxHealth);
+                            DrawCircle(static_cast<int>(enemy.x * (cellSize + otstup) + enemyOffset),
+                                static_cast<int>(enemy.y * (cellSize + otstup) + enemyOffset),
+                                static_cast<int>(cellSize / 4), enemyColor);
+                        }
+                    }
 
-            for (const auto& enemy : enemies) {
-                if (enemy.alive) {
-                    float enemyOffset = cellSize / 2;
-                    Color enemyColor = interpolateColor(enemy.health, enemy.maxHealth);
-                    DrawCircle(static_cast<int>(enemy.x * (cellSize + otstup) + enemyOffset),
-                        static_cast<int>(enemy.y * (cellSize + otstup) + enemyOffset),
-                        static_cast<int>(cellSize / 4), enemyColor);
+                    DrawText(("Turrets: " + std::to_string(turrets.size())).c_str(), 600, 10, 20, WHITE);
+                    DrawText(("Wave: " + std::to_string(waveNumber)).c_str(), 600, 40, 20, WHITE);
+                    DrawText(("Adjustments left: " + std::to_string(turretAdjustmentsAvailable)).c_str(), 600, 70, 20, WHITE);
                 }
+                // Отображение сообщения "YOU LOOSE" и кнопки "Restart"
+                if (gameOver) {
+                    const char* loseMessage = "YOU LOSE";
+                    const char* restartMessage = "Restart";
+                    int fontSizeLose = 80;
+                    int fontSizeRestart = 30;
+
+                    int loseTextWidth = MeasureText(loseMessage, fontSizeLose);
+                    int loseTextHeight = fontSizeLose;
+                    int restartTextWidth = MeasureText(restartMessage, fontSizeRestart);
+                    int restartTextHeight = fontSizeRestart;
+
+                    int xLose = (GetScreenWidth() - loseTextWidth) / 2;
+                    int yLose = (GetScreenHeight() - loseTextHeight) / 2 - loseTextHeight / 2;
+                    DrawText(loseMessage, xLose, yLose, fontSizeLose, RED);
+
+                    // Рисуем кнопку Restart
+                    DrawRectangleRec(restartButton, GREEN);
+                    int xRestart = restartButton.x + (restartButton.width - restartTextWidth) / 2;
+                    int yRestart = restartButton.y + (restartButton.height - fontSizeRestart) / 2;
+                    DrawText(restartMessage, xRestart, yRestart, fontSizeRestart, BLACK);
+
+                    // Проверяем нажатие на кнопку Restart
+                    if (CheckCollisionPointRec(GetMousePosition(), restartButton) && IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
+                    {
+                        gameOver = false;
+                        gameLost = false;
+                        enemies.clear();
+                        waveNumber = 0;
+                        spawnTimer = 0.0f;
+                        baseHealth = 3;
+                        turrets.clear();
+                        turretAdjustmentsAvailable = 4;
+                    }
+                }
+
+                EndDrawing();
             }
-
-            DrawText(("Turrets: " + std::to_string(turrets.size())).c_str(), 600, 10, 20, WHITE);
-            DrawText(("Wave: " + std::to_string(waveNumber)).c_str(), 600, 40, 20, WHITE);
-            DrawText(("Adjustments left: " + std::to_string(turretAdjustmentsAvailable)).c_str(), 600, 70, 20, WHITE);
         }
-        // Отображение сообщения "YOU LOOSE" и кнопки "Restart"
-        if (gameOver) {
-            const char* loseMessage = "YOU LOSE";
-            const char* restartMessage = "Restart";
-            int fontSizeLose = 80;
-            int fontSizeRestart = 30;
+        else {
+            // Отрисовка меню
+            BeginDrawing();
+            ClearBackground(WHITE);
 
-            int loseTextWidth = MeasureText(loseMessage, fontSizeLose);
-            int loseTextHeight = fontSizeLose;
-            int restartTextWidth = MeasureText(restartMessage, fontSizeRestart);
-            int restartTextHeight = fontSizeRestart;
+            // Отрисовка названия игры
+            const char* title = "TOWER DEFENSE";
+            int titleFontSize = 60;
+            int titleWidth = MeasureText(title, titleFontSize);
+            DrawText(title, (GetScreenWidth() - titleWidth) / 2, 150, titleFontSize, BLUE);
 
-            int xLose = (GetScreenWidth() - loseTextWidth) / 2;
-            int yLose = (GetScreenHeight() - loseTextHeight) / 2 - loseTextHeight / 2;
-            DrawText(loseMessage, xLose, yLose, fontSizeLose, RED);
+            // Отрисовка кнопки Start
+            DrawRectangleRec(startButton, GREEN);
+            const char* startText = "START";
+            int startTextWidth = MeasureText(startText, 30);
+            DrawText(startText, startButton.x + (startButton.width - startTextWidth) / 2,
+                startButton.y + (startButton.height - 30) / 2, 30, BLACK);
 
-            // Рисуем кнопку Restart
-            DrawRectangleRec(restartButton, GREEN);
-            int xRestart = restartButton.x + (restartButton.width - restartTextWidth) / 2;
-            int yRestart = restartButton.y + (restartButton.height - fontSizeRestart) / 2;
-            DrawText(restartMessage, xRestart, yRestart, fontSizeRestart, BLACK);
-
-            // Проверяем нажатие на кнопку Restart
-            if (CheckCollisionPointRec(GetMousePosition(), restartButton) && IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
-            {
-                gameOver = false;
-                gameLost = false;
-                enemies.clear();
-                waveNumber = 0;
-                spawnTimer = 0.0f;
-                baseHealth = 3;
-                turrets.clear();
-                turretAdjustmentsAvailable = 4;
-            }
-
+            EndDrawing();
         }
-
-        EndDrawing();
     }
 
     CloseWindow();
